@@ -17,9 +17,9 @@ services:
     image: postgres:17
     container_name: tasky_db
     environment:
-      POSTGRES_DB: tasky
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: $(DATABASE_NAME)
+      POSTGRES_USER: $(DATABASE_USER)
+      POSTGRES_PASSWORD: $(DATABASE_PASSWORD)
     ports:
       - "5432:5432"
 
