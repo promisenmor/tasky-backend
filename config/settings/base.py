@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
+    "daphne",
     "django.contrib.staticfiles",
     # django apps
     "rest_framework",
@@ -32,6 +33,12 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "django_filters",
     "corsheaders",
+    # async features
+    "channels",
+    "django_celery_beat",
+    "django_celery_results",
+    # apps
+    "apps.accounts",
 ]
 
 MIDDLEWARE = [
@@ -70,8 +77,12 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env("DATABASE_NAME"),
+        "USER": env("DATABASE_USER"),
+        "PASSWORD": env("DATABASE_PASSWORD"),
+        "HOST": env("DATABASE_HOST"),
+        "PORT": env("DATABASE_PORT"),
     }
 }
 
@@ -105,6 +116,10 @@ TIME_ZONE = "UTC"
 USE_I18N = True
 
 USE_TZ = True
+
+
+# AUTH SETTINGS
+AUTH_USER_MODEL = "accounts.User"
 
 
 # Static files (CSS, JavaScript, Images)
@@ -145,3 +160,25 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Tasky API Documentation",
     "VERSION": "1.0.0",
 }
+
+
+# redis settings
+ASGI_APPLICATION = "config.asgi.application"
+
+CHANNELS_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [env("REDIS_URL")],
+        },
+    },
+}
+
+# celery settings
+CELERY_BROKER_URL = env("REDIS_URL")
+CELERY_RESULT_BACKEND = "django-db"
+
+CELERY_ACCEPT_CONTENT = ["application/json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = TIME_ZONE
