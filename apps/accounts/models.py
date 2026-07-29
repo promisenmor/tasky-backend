@@ -24,6 +24,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    is_email_verified = models.BooleanField(default=False)
+
     objects = UserManager()
 
     USERNAME_FIELD = "email"

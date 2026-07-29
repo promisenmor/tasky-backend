@@ -1,8 +1,8 @@
 from django.contrib.auth import authenticate
 from rest_framework import generics, status
+from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import User
@@ -20,11 +20,12 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = [AllowAny]
 
 
-class LoginView(APIView):
+class LoginView(GenericAPIView):
+    serializer_class = LoginSerializer
     permission_classes = [AllowAny]
 
     def post(self, request):
-        serializer = LoginSerializer(data=request.data)
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         user = authenticate(
@@ -59,20 +60,15 @@ class MeView(generics.RetrieveAPIView):
         return self.request.user
 
 
-class LogoutView(APIView):
+class LogoutView(GenericAPIView):
+    serializer_class = LogoutSerializer
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        serializer = LogoutSerializer(data=request.data)
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         refresh = serializer.validated_data.get("refresh")
-
-        if not refresh:
-            return Response(
-                {"detail": "Refresh token is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
 
         try:
             token = RefreshToken(refresh)
