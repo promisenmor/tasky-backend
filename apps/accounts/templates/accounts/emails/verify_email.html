@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+</head>
+
+<body style="font-family: Arial, Helvetica, sans-serif; background:#f5f5f5; padding:40px;">
+
+<div style="
+    max-width:600px;
+    margin:auto;
+    background:white;
+    padding:40px;
+    border-radius:10px;
+">
+
+<h2>Hello {{ user.first_name }},</h2>
+
+<p>
+Thank you for creating a Tasky account.
+</p>
+
+<p>
+Please click the button below to verify your email address.
+</p>
+
+<p style="margin:40px 0;">
+    <a
+        href="{{ verification_url }}"
+        style="
+            background:#2563eb;
+            color:white;
+            text-decoration:none;
+            padding:14px 28px;
+            border-radius:8px;
+            display:inline-block;
+        "
+    >
+        Verify Email
+    </a>
+</p>
+
+<p>
+If the button doesn't work, copy and paste this link into your browser:
+</p>
+
+<p>
+
+{{ verification_url }}
+
+</p>
+
+<hr>
+
+<p style="color:#666;font-size:14px;">
+If you didn't create a Tasky account, you can safely ignore this email.
+</p>
+
+</div>
+
+</body>
+</html>

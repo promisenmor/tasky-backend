@@ -1,0 +1,9 @@
+Hello {{ user.first_name }},
+
+Thank you for creating a Tasky account.
+
+Please verify your email by visiting the link below:
+
+{{ verification_url }}
+
+If you didn't create this account, you can ignore this email.

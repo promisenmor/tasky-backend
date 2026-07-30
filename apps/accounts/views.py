@@ -1,4 +1,7 @@
 from django.contrib.auth import authenticate
+from django.shortcuts import render
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
 from rest_framework import generics, status
 from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -11,13 +14,68 @@ from .serializers import (
     LogoutSerializer,
     UserCreateSerializer,
     UserSerializer,
+    VerifyEmailSerializer,
 )
+from .services import register_user
+from .tokens import email_verification_token
 
 
 class RegisterView(generics.CreateAPIView):
-    queryset = User.objects.all()
     serializer_class = UserCreateSerializer
     permission_classes = [AllowAny]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        register_user(serializer=serializer)
+
+        return Response(
+            {
+                "message": (
+                    "Registration successful. "
+                    "Please check your email to verify your account. "
+                )
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class VerifyEmailView(GenericAPIView):
+    serializer_class = VerifyEmailSerializer
+    permission_classes = [AllowAny]
+
+    def get(self, request, uidb64, token):
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return render(
+                "accounts/email_verification_failed.html",
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not email_verification_token.check_token(user, token):
+            return render(
+                request,
+                "accounts/email_verification_failed.html",
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if user.is_email_verified:
+            return render(
+                request,
+                "accounts/email_verified.html",
+                status=status.HTTP_200_OK,
+            )
+
+        user.is_email_verified = True
+        user.save(update_fields=["is_email_verified"])
+
+        return render(
+            request, "accounts/email_verified.html", status=status.HTTP_200_OK
+        )
 
 
 class LoginView(GenericAPIView):
@@ -38,6 +96,12 @@ class LoginView(GenericAPIView):
             return Response(
                 {"detail": "Invalid credentials."},
                 status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if not user.is_email_verified:
+            return Response(
+                {"detail": "Please verify your email before logging in."},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         refresh = RefreshToken.for_user(user)

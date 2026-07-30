@@ -13,6 +13,18 @@ services:
       - db
       - redis
 
+  celery-worker:
+    build: .
+    container_name: tasky_celery_worker
+    command: celery -A config worker -l info
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+
   db:
     image: postgres:17
     container_name: tasky_db
