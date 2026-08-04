@@ -12,11 +12,12 @@ from .models import User
 from .serializers import (
     LoginSerializer,
     LogoutSerializer,
+    ResendVerificationEmailSerializer,
     UserCreateSerializer,
     UserSerializer,
     VerifyEmailSerializer,
 )
-from .services import register_user
+from .services import register_user, resend_verification_email
 from .tokens import email_verification_token
 
 
@@ -75,6 +76,27 @@ class VerifyEmailView(GenericAPIView):
 
         return render(
             request, "accounts/email_verified.html", status=status.HTTP_200_OK
+        )
+
+
+class ResendVerificationEmailView(GenericAPIView):
+    serializer_class = ResendVerificationEmailSerializer
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        resend_verification_email(email=serializer.validated_data["email"])
+
+        return Response(
+            {
+                "message": (
+                    "If an unverified account exists, "
+                    "a verification email has been sent."
+                )
+            },
+            status=status.HTTP_200_OK,
         )
 
 
