@@ -17,17 +17,25 @@ from .serializers import (
     LogoutSerializer,
     ResendVerificationEmailSerializer,
     ResetPasswordSerializer,
+    UpdateProfileSerializer,
     UserCreateSerializer,
     UserSerializer,
     VerifyEmailSerializer,
 )
 from .services import register_user, request_password_reset, resend_verification_email
+from .throttles import (
+    ForgotPasswordThrottle,
+    LoginThrottle,
+    RegisterThrottle,
+    ResendVerificationRateThrottle,
+)
 from .tokens import email_verification_token, password_reset_token
 
 
 class RegisterView(generics.CreateAPIView):
     serializer_class = UserCreateSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [RegisterThrottle]
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -86,6 +94,7 @@ class VerifyEmailView(GenericAPIView):
 class ResendVerificationEmailView(GenericAPIView):
     serializer_class = ResendVerificationEmailSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [ResendVerificationRateThrottle]
 
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
@@ -107,6 +116,7 @@ class ResendVerificationEmailView(GenericAPIView):
 class LoginView(GenericAPIView):
     serializer_class = LoginSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [LoginThrottle]
 
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
@@ -178,6 +188,7 @@ class LogoutView(GenericAPIView):
 class ForgotPasswordView(GenericAPIView):
     serializer_class = ForgotPasswordSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [ForgotPasswordThrottle]
 
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
@@ -254,3 +265,11 @@ class ChangePasswordView(GenericAPIView):
 
 class RefreshTokenView(TokenRefreshView):
     permission_classes = [AllowAny]
+
+
+class UpdateProfileView(generics.UpdateAPIView):
+    serializer_class = UpdateProfileSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user

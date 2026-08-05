@@ -127,3 +127,12 @@ class ChangePasswordSerializer(serializers.Serializer):
             )
 
         return attrs
+
+
+class UpdateProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            "first_name",
+            "last_name",
+        ]

@@ -10,6 +10,7 @@ from .views import (
     RegisterView,
     ResendVerificationEmailView,
     ResetPasswordView,
+    UpdateProfileView,
     VerifyEmailView,
 )
 
@@ -36,6 +37,11 @@ urlpatterns = [
         name="token-refresh",
     ),
     path("login/", LoginView.as_view(), name="login"),
-    path("me/", MeView.as_view(), name="me"),
     path("logout/", LogoutView.as_view(), name="logout"),
+    path("me/", MeView.as_view(), name="me"),
+    path(
+        "profile/",
+        UpdateProfileView.as_view(),
+        name="update-profile",
+    ),
 ]

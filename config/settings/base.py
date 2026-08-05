@@ -145,6 +145,18 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "1000/day",
+        "user": "1000/day",
+        "login": "5/minutes",
+        "register": "5/minutes",
+        "forgot_password": "3/minutes",
+        "resend_verification": "3/minutes",
+    },
 }
 
 
@@ -173,6 +185,13 @@ CHANNELS_LAYERS = {
             "hosts": [env("REDIS_URL")],
         },
     },
+}
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": env("REDIS_URL"),
+    }
 }
 
 # celery settings
