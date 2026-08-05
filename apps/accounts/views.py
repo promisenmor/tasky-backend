@@ -7,6 +7,7 @@ from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenRefreshView
 
 from .models import User
 from .serializers import (
@@ -249,3 +250,7 @@ class ChangePasswordView(GenericAPIView):
         return Response(
             {"detail": "Password changed successfully."}, status=status.HTTP_200_OK
         )
+
+
+class RefreshTokenView(TokenRefreshView):
+    permission_classes = [AllowAny]
