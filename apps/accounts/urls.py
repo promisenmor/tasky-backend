@@ -1,11 +1,13 @@
 from django.urls import path
 
 from .views import (
+    ForgotPasswordView,
     LoginView,
     LogoutView,
     MeView,
     RegisterView,
     ResendVerificationEmailView,
+    ResetPasswordView,
     VerifyEmailView,
 )
 
@@ -18,6 +20,12 @@ urlpatterns = [
         "resend-verification/",
         ResendVerificationEmailView.as_view(),
         name="resend-email",
+    ),
+    path("forgot-password/", ForgotPasswordView.as_view(), name="forgot-password"),
+    path(
+        "reset-password/<uidb64>/<token>/",
+        ResetPasswordView.as_view(),
+        name="password-reset",
     ),
     path("login/", LoginView.as_view(), name="login"),
     path("me/", MeView.as_view(), name="me"),

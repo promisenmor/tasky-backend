@@ -35,3 +35,37 @@ def send_verification_email(user, verification_url):
     email.attach_alternative(html_content, "text/html")
 
     email.send()
+
+
+def send_password_reset_email(*, user, reset_url):
+    """
+    Send a password reset email.
+    """
+
+    context = {
+        "user": user,
+        "reset_url": reset_url,
+    }
+
+    subject = "Reset your Tasky password"
+
+    text_content = render_to_string(
+        "accounts/emails/password_reset.txt",
+        context,
+    )
+
+    html_content = render_to_string(
+        "accounts/emails/password_reset.html",
+        context,
+    )
+
+    email = EmailMultiAlternatives(
+        subject=subject,
+        body=text_content,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[user.email],
+    )
+
+    email.attach_alternative(html_content, "text/html")
+
+    email.send()

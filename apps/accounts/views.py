@@ -10,15 +10,17 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import User
 from .serializers import (
+    ForgotPasswordSerializer,
     LoginSerializer,
     LogoutSerializer,
     ResendVerificationEmailSerializer,
+    ResetPasswordSerializer,
     UserCreateSerializer,
     UserSerializer,
     VerifyEmailSerializer,
 )
-from .services import register_user, resend_verification_email
-from .tokens import email_verification_token
+from .services import register_user, request_password_reset, resend_verification_email
+from .tokens import email_verification_token, password_reset_token
 
 
 class RegisterView(generics.CreateAPIView):
@@ -168,4 +170,57 @@ class LogoutView(GenericAPIView):
         return Response(
             {"detail": "Logout successful."},
             status=status.HTTP_205_RESET_CONTENT,
+        )
+
+
+class ForgotPasswordView(GenericAPIView):
+    serializer_class = ForgotPasswordSerializer
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        request_password_reset(email=serializer.validated_data["email"])
+
+        return Response(
+            {
+                "message": (
+                    "If an account exists with this email, "
+                    "a password reset link has been sent."
+                )
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class ResetPasswordView(GenericAPIView):
+    serializer_class = ResetPasswordSerializer
+    permission_classes = [AllowAny]
+
+    def post(self, request, uidb64, token):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return Response(
+                {"detail": "Invalid reset link."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not password_reset_token.check_token(user, token):
+            return Response(
+                {"detail": "Invalid or expired reset link."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user.set_password(serializer.validated_data["password"])
+        user.save()
+
+        return Response(
+            {"message": "Password has been reset successfully."},
+            status=status.HTTP_200_OK,
         )

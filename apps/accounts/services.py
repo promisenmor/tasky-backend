@@ -1,5 +1,6 @@
 from .models import User
-from .tasks import send_verification_email_task
+from .tasks import send_password_reset_email_task, send_verification_email_task
+from .tokens import password_reset_token
 
 
 def register_user(*, serializer):
@@ -24,3 +25,20 @@ def resend_verification_email(*, email):
         return
 
     send_verification_email_task.delay(user.id)
+
+
+def request_password_reset(*, email):
+    try:
+        user = User.objects.get(email=email)
+    except User.DoesNotExist:
+        return
+
+    if not user.is_active:
+        return
+
+    token = password_reset_token.make_token(user)
+
+    send_password_reset_email_task.delay(
+        user.id,
+        token,
+    )
