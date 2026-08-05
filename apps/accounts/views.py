@@ -10,6 +10,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import User
 from .serializers import (
+    ChangePasswordSerializer,
     ForgotPasswordSerializer,
     LoginSerializer,
     LogoutSerializer,
@@ -223,4 +224,28 @@ class ResetPasswordView(GenericAPIView):
         return Response(
             {"message": "Password has been reset successfully."},
             status=status.HTTP_200_OK,
+        )
+
+
+class ChangePasswordView(GenericAPIView):
+    serializer_class = ChangePasswordSerializer
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+
+        if not user.check_password(serializer.validated_data["current_password"]):
+            return Response(
+                {"detail": "Current password is incorrect"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user.set_password(serializer.validated_data["new_password"])
+        user.save(update_fields=["password"])
+
+        return Response(
+            {"detail": "Password changed successfully."}, status=status.HTTP_200_OK
         )
