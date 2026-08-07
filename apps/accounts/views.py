@@ -47,7 +47,7 @@ class RegisterView(generics.CreateAPIView):
             {
                 "message": (
                     "Registration successful. "
-                    "Please check your email to verify your account. "
+                    "Please check your email to verify your account."
                 )
             },
             status=status.HTTP_201_CREATED,
@@ -65,17 +65,12 @@ class VerifyEmailView(GenericAPIView):
 
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
             return render(
-                "accounts/email_verification_failed.html",
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if not email_verification_token.check_token(user, token):
-            return render(
                 request,
                 "accounts/email_verification_failed.html",
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # already verified
         if user.is_email_verified:
             return render(
                 request,
@@ -83,6 +78,15 @@ class VerifyEmailView(GenericAPIView):
                 status=status.HTTP_200_OK,
             )
 
+        # Invalid or expired token
+        if not email_verification_token.check_token(user, token):
+            return render(
+                request,
+                "accounts/email_verification_failed.html",
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # verify email
         user.is_email_verified = True
         user.save(update_fields=["is_email_verified"])
 
