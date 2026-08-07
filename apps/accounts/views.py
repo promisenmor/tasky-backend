@@ -74,7 +74,7 @@ class VerifyEmailView(GenericAPIView):
         if user.is_email_verified:
             return render(
                 request,
-                "accounts/email_verified.html",
+                "accounts/email_already_verified.html",
                 status=status.HTTP_200_OK,
             )
 

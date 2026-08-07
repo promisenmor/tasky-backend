@@ -281,7 +281,7 @@ def test_verify_email_already_verified(api_client, verified_user):
     )
 
     assert response.status_code == 200
-    assert "Email already verified" in response.content.decode()
+    assert "Email Already Verified" in response.content.decode()
 
 
 @pytest.mark.django_db
