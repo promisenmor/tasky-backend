@@ -61,5 +61,5 @@ class Membership(models.Model):
         verbose_name = _("Membership")
         verbose_name_plural = _("Memberships")
 
-        def __str__(self) -> str:
-            return f"{self.user.email} -> {self.organization.name}"
+    def __str__(self) -> str:
+        return f"{self.user.email} → {self.organization.name}"
