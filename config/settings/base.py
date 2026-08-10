@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "django_celery_results",
     # apps
     "apps.accounts",
+    "apps.organizations",
 ]
 
 MIDDLEWARE = [
