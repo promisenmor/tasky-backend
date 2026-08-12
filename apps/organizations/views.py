@@ -5,23 +5,23 @@ from rest_framework.response import Response
 from .models import Organization
 from .permissions import IsOrganizationMember
 from .serializers import (
-    OgranizationCreateSerailizer,
+    OrganizationCreateSerializer,
     OrganizationSerializer,
 )
 from .services import create_organization
 
 
 class OrganizationCreateView(generics.CreateAPIView):
-    serializer_class = OgranizationCreateSerailizer
+    serializer_class = OrganizationCreateSerializer
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        serializeer = self.get_serializer(data=request.data)
-        serializeer.is_valid(raise_exception=True)
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
         organization = create_organization(
             user=request.user,
-            **serializeer.validated_data,
+            **serializer.validated_data,
         )
 
         return Response(

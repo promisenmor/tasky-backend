@@ -22,7 +22,7 @@ class OrganizationSerializer(serializers.ModelSerializer):
         ]
 
 
-class OgranizationCreateSerailizer(serializers.ModelSerializer):
+class OrganizationCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Organization
         fields = [
