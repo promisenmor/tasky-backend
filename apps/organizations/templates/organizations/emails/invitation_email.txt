@@ -1,0 +1,17 @@
+Hi,
+
+{{ invitation.invited_by.get_full_name }} has invited you to join
+{{ invitation.organization.name }} on Tasky.
+
+You've been invited as a {{ invitation.get_role_display }}.
+
+Accept your invitation here:
+
+{{ invitation_url }}
+
+This invitation expires on {{ invitation.expires_at|date:"F j, Y, g:i A" }}.
+
+If you weren't expecting this invitation, you can safely ignore this email.
+
+Thanks,
+The Tasky Team
