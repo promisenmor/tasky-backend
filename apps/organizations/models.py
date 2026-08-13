@@ -2,6 +2,7 @@ from uuid import uuid4
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 
@@ -63,3 +64,49 @@ class Membership(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user.email} → {self.organization.name}"
+
+
+class Invitation(models.Model):
+    class Role(models.TextChoices):
+        ADMIN = "ADMIN", "Admin"
+        MEMBER = "MEMBER", "Member"
+
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="invitations",
+    )
+    email = models.EmailField()
+    role = models.CharField(
+        max_length=20,
+        choices=Role.choices,
+        default=Role.MEMBER,
+    )
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="sent_invitations",
+    )
+
+    token = models.UUIDField(default=uuid4, unique=True, editable=False)
+    expires_at = models.DateTimeField()
+    accepted_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "organization_invitations"
+        ordering = ["-created_at"]
+
+    @property
+    def is_expired(self):
+        return timezone.now() >= self.expires_at
+
+    @property
+    def is_accepted(self):
+        return self.accepted_at is not None
+
+    def __str__(self):
+        return f"{self.email} → {self.organization.name}"
