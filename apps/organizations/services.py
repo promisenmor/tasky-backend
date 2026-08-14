@@ -4,6 +4,8 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
+from apps.organizations.tasks import send_invitation_email_task
+
 from .models import Invitation, Membership, Organization
 
 INVITATION_EXPIRATION_HOURS = 72
@@ -46,10 +48,14 @@ def create_invitation(*, organization, invited_by, email, role):
     ).exists():
         raise ValidationError("A pending invitation already exists for this email.")
 
-    return Invitation.objects.create(
+    invitation = Invitation.objects.create(
         organization=organization,
         email=email,
         role=role,
         invited_by=invited_by,
         expires_at=timezone.now() + timedelta(hours=INVITATION_EXPIRATION_HOURS),
     )
+
+    transaction.on_commit(lambda: send_invitation_email_task.delay(invitation.id))
+
+    return invitation
