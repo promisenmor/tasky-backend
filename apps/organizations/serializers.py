@@ -90,7 +90,7 @@ class InvitationCreateSerializer(serializers.ModelSerializer):
         return value.lower().strip()
 
     def validate_role(self, value):
-        if value == Invitation.Role.OWNER:
+        if value == Membership.Role.OWNER:
             raise serializers.ValidationError("An owner cannot be invited.")
         return value
 
