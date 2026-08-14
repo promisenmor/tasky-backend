@@ -1,7 +1,9 @@
 from django.urls import path
 
 from .views import (
+    InvitationAcceptView,
     InvitationCreateView,
+    InvitationDeclineView,
     MembershipDetailView,
     MembershipListView,
     OrganizationCreateView,
@@ -39,5 +41,15 @@ urlpatterns = [
         "<uuid:organization_id>/members/<uuid:membership_id>/",
         MembershipDetailView.as_view(),
         name="detail-member",
+    ),
+    path(
+        "invitations/<uuid:token>/accept/",
+        InvitationAcceptView.as_view(),
+        name="invitation-accept",
+    ),
+    path(
+        "invitations/<uuid:token>/decline/",
+        InvitationDeclineView.as_view(),
+        name="invitation-decline",
     ),
 ]

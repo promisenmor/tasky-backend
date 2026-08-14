@@ -59,3 +59,48 @@ def create_invitation(*, organization, invited_by, email, role):
     transaction.on_commit(lambda: send_invitation_email_task.delay(invitation.id))
 
     return invitation
+
+
+@transaction.atomic
+def accept_invitation(*, invitation, user):
+    if invitation.accepted_at is not None:
+        raise ValidationError("This invitation has already been accepted.")
+
+    if invitation.expires_at < timezone.now():
+        raise ValidationError("This invitation has expired.")
+
+    if invitation.email.lower() != user.email.lower():
+        raise ValidationError("This invitation is not for the current user.")
+
+    existing_membership = Membership.objects.filter(
+        organization=invitation.organization,
+        user=user,
+    ).exists()
+
+    if existing_membership:
+        raise ValidationError("This user is already a member of the organization.")
+
+    membership = Membership.objects.create(
+        user=user,
+        organization=invitation.organization,
+        role=invitation.role,
+    )
+
+    invitation.accepted_at = timezone.now()
+    invitation.save(update_fields=["accepted_at", "updated_at"])
+
+    return membership
+
+
+@transaction.atomic
+def decline_invitation(*, invitation, user):
+    if invitation.accepted is not None:
+        raise ValidationError("This invitation has already been accepted.")
+
+    if invitation.is_expired:
+        raise ValidationError("This invitation has expired.")
+
+    if invitation.emaill.lower() != user.email.lower():
+        raise ValidationError("This invitation was sent to a different address.")
+
+    invitation.delete()
