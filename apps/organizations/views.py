@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import (
+    Invitation,
     Membership,
     Organization,
 )
@@ -19,7 +20,12 @@ from .serializers import (
     OrganizationCreateSerializer,
     OrganizationSerializer,
 )
-from .services import create_invitation, create_organization
+from .services import (
+    accept_invitation,
+    create_invitation,
+    create_organization,
+    decline_invitation,
+)
 
 
 class OrganizationCreateView(generics.CreateAPIView):
@@ -99,6 +105,51 @@ class InvitationCreateView(generics.CreateAPIView):
         return Response(
             InvitationSerializer(invitation).data,
             status=status.HTTP_201_CREATED,
+        )
+
+
+class InvitationAcceptView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = MembershipSerializer
+
+    def post(self, request, token):
+        invitation = get_object_or_404(
+            Invitation,
+            token=token,
+        )
+
+        try:
+            membership = accept_invitation(
+                invitation=invitation,
+                user=request.user,
+            )
+
+        except ValidationError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+
+        return Response(
+            MembershipSerializer(membership).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class InvitationDeclineView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, token):
+        invitation = get_object_or_404(Invitation, token=token)
+
+        try:
+            decline_invitation(
+                invitation=invitation,
+                user=request.user,
+            )
+
+        except ValidationError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+
+        return Response(
+            {"detail": "Invitation declined successfully."}, status=status.HTTP_200_OK
         )
 
 

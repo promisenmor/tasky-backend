@@ -20,7 +20,14 @@ def send_invitation_email_task(invitation_id):
     except Invitation.DoesNotExist:
         return
 
-    invitation_url = f"{settings.BACKEND_URL}{reverse('accept-invitation', kwargs={'invitation_id': invitation.id})}"
+    path = reverse(
+        "invitation-accept",
+        kwargs={
+            "token": invitation.token,
+        },
+    )
+
+    invitation_url = f"{settings.BACKEND_URL}{path}"
 
     send_invitation_email(
         invitation=invitation,
