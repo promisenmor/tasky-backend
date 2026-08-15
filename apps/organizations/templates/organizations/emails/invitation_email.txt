@@ -1,6 +1,6 @@
 Hi,
 
-{{ invitation.invited_by.get_full_name }} has invited you to join
+{{ invitation.invited_by.full_name }} has invited you to join
 {{ invitation.organization.name }} on Tasky.
 
 You've been invited as a {{ invitation.get_role_display }}.
