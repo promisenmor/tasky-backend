@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from apps.accounts.models import User
+
 from .models import Invitation, Membership, Organization
 
 
@@ -144,3 +146,38 @@ class InvitationSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+
+class InvitationDetailSerailizer(serializers.ModelSerializer):
+    organization = serializers.CharField(
+        source="organization.name",
+        read_only=True,
+    )
+    invited_by_name = serializers.CharField(
+        source="invited_by.full_name",
+        read_only=True,
+    )
+    role_display = serializers.CharField(
+        source="get_role_display",
+        read_only=True,
+    )
+    requires_registration = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Invitation
+        fields = [
+            "id",
+            "organization_name",
+            "invited_by_name",
+            "email",
+            "role",
+            "role_display",
+            "expires_at",
+            "accepted_at",
+            "is_expired",
+            "is_accepted",
+            "requires_registration",
+        ]
+
+    def get_requires_registration(self, obj):
+        return not User.objects.filter(email__iexact=obj.email).exists()

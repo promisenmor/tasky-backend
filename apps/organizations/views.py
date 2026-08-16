@@ -1,7 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, serializers, status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from .models import (
@@ -15,6 +15,7 @@ from .permissions import (
 )
 from .serializers import (
     InvitationCreateSerializer,
+    InvitationDetailSerailizer,
     InvitationSerializer,
     MembershipSerializer,
     OrganizationCreateSerializer,
@@ -212,3 +213,15 @@ class MembershipDetailView(generics.RetrieveUpdateDestroyAPIView):
         )
 
         return membership
+
+
+class InvitationDetailView(generics.RetrieveAPIView):
+    serializer_class = InvitationDetailSerailizer
+    permission_classes = [AllowAny]
+    lookup_field = "token"
+
+    def get_queryset(self):
+        return Invitation.objects.select_related(
+            "organization",
+            "invited_by",
+        )
