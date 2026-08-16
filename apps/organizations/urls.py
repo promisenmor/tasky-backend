@@ -4,6 +4,7 @@ from .views import (
     InvitationAcceptView,
     InvitationCreateView,
     InvitationDeclineView,
+    InvitationDetailView,
     MembershipDetailView,
     MembershipListView,
     OrganizationCreateView,
@@ -51,5 +52,10 @@ urlpatterns = [
         "invitations/<uuid:token>/decline/",
         InvitationDeclineView.as_view(),
         name="invitation-decline",
+    ),
+    path(
+        "invitations/<uuid:token>/",
+        InvitationDetailView.as_view(),
+        name="invitation-detail",
     ),
 ]
