@@ -5,10 +5,13 @@ from .views import (
     InvitationCreateView,
     InvitationDeclineView,
     InvitationDetailView,
+    MembershipDeleteView,
     MembershipDetailView,
     MembershipListView,
+    MembershipUpdateView,
     OrganizationCreateView,
     OrganizationDetailView,
+    OrganizationLeaveView,
     OrganizationListView,
 )
 
@@ -57,5 +60,25 @@ urlpatterns = [
         "invitations/<uuid:token>/",
         InvitationDetailView.as_view(),
         name="invitation-detail",
+    ),
+    path(
+        "<uuid:organization_id>/members/",
+        MembershipListView.as_view(),
+        name="membership-list",
+    ),
+    path(
+        "<uuid:organization_id/members/<uuid:pk>/",
+        MembershipUpdateView.as_view(),
+        name="membership-update",
+    ),
+    path(
+        "<uuid:organization_id/members/<uuid:pk>/remove/",
+        MembershipDeleteView.as_view(),
+        name="membership-remove",
+    ),
+    path(
+        "<uuid:organization_id>/leave/",
+        OrganizationLeaveView.as_view(),
+        name="organization-leave",
     ),
 ]

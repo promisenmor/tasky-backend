@@ -83,6 +83,12 @@ class MembershipSerializer(serializers.ModelSerializer):
         ]
 
 
+class MembershipUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Membership
+        fields = ["role"]
+
+
 class InvitationCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Invitation
