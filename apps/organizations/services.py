@@ -66,6 +66,9 @@ def accept_invitation(*, invitation, user):
     if invitation.accepted_at is not None:
         raise ValidationError("This invitation has already been accepted.")
 
+    if invitation.declined_at is not None:
+        raise ValidationError("This invitation has already been declined.")
+
     if invitation.expires_at < timezone.now():
         raise ValidationError("This invitation has expired.")
 
@@ -94,13 +97,17 @@ def accept_invitation(*, invitation, user):
 
 @transaction.atomic
 def decline_invitation(*, invitation, user):
-    if invitation.accepted is not None:
+    if invitation.accepted_at is not None:
         raise ValidationError("This invitation has already been accepted.")
+
+    if invitation.is_declined:
+        raise ValidationError("This invitation has already been declined.")
 
     if invitation.is_expired:
         raise ValidationError("This invitation has expired.")
 
-    if invitation.emaill.lower() != user.email.lower():
+    if invitation.email.lower() != user.email.lower():
         raise ValidationError("This invitation was sent to a different address.")
 
-    invitation.delete()
+    invitation.declined_at = timezone.now()
+    invitation.save(update_fields=["declined_at", "updated_at"])
