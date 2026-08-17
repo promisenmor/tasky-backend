@@ -116,6 +116,10 @@ class InvitationSerializer(serializers.ModelSerializer):
         read_only=True,
     )
 
+    is_declined = serializers.BooleanField(
+        read_only=True,
+    )
+
     class Meta:
         model = Invitation
         fields = [
@@ -130,6 +134,8 @@ class InvitationSerializer(serializers.ModelSerializer):
             "accepted_at",
             "is_expired",
             "is_accepted",
+            "declined_at",
+            "is_declined",
             "created_at",
             "updated_at",
         ]
@@ -141,6 +147,8 @@ class InvitationSerializer(serializers.ModelSerializer):
             "invited_by_email",
             "expires_at",
             "accepted_at",
+            "declined_at",
+            "is_declined",
             "is_expired",
             "is_accepted",
             "created_at",

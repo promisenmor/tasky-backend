@@ -92,6 +92,7 @@ class Invitation(models.Model):
     token = models.UUIDField(default=uuid4, unique=True, editable=False)
     expires_at = models.DateTimeField()
     accepted_at = models.DateTimeField(null=True, blank=True)
+    declined_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -107,6 +108,10 @@ class Invitation(models.Model):
     @property
     def is_accepted(self):
         return self.accepted_at is not None
+
+    @property
+    def is_declined(self):
+        return self.declined_at is not None
 
     def __str__(self):
         return f"{self.email} → {self.organization.name}"
