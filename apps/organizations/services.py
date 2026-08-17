@@ -111,3 +111,75 @@ def decline_invitation(*, invitation, user):
 
     invitation.declined_at = timezone.now()
     invitation.save(update_fields=["declined_at", "updated_at"])
+
+
+# Membership activites
+@transaction.atomic
+def change_member_role(*, membership, actor, new_role):
+    actor_membership = Membership.objects.get(
+        user=actor,
+        organization=Membership.organization,
+    )
+
+    if membership.role == Membership.Role.OWNER:
+        raise ValidationError("The organization owner cannot have their role changed.")
+
+    if new_role == Membership.Role.OWNER:
+        raise ValidationError("Ownership cannot be assigned through this operation.")
+
+    if actor_membership.role == Membership.Role.MEMBER:
+        raise ValidationError("Members cannot change their membership roles.")
+
+    if (
+        actor_membership.role == Membership.Role.ADMIN
+        and membership.role == Membership.Role.ADMIN
+    ):
+        raise ValidationError("Admins cannot change another admins's role")
+
+    membership.role = new_role
+    membership.save(update_fields=["role"])
+
+    return membership
+
+
+@transaction.atomic
+def remove_member(*, membership, actor):
+    actor_membership = Membership.objects.get(
+        user=actor,
+        organization=membership.organization,
+    )
+
+    if membership.role == Membership.Role.OWNER:
+        raise ValidationError("The organization owner cannot be removed.")
+
+    if actor_membership.role == Membership.Role.MEMBER:
+        raise ValidationError("Members cannot remove other members.")
+
+    if (
+        actor_membership.role == Membership.Role.ADMIN
+        and membership.role == Membership.Role.ADMIN
+    ):
+        raise ValidationError("Admins cannot remove other admins.")
+
+    if membership.user_id == actor.id:
+        raise ValidationError("use the leave organization endpoint to leave.")
+
+    membership.delete()
+
+
+@transaction.atomic
+def leave_organization(*, organization, user):
+    membership = Membership.objects.filter(
+        organization=organization,
+        user=user,
+    ).first()
+
+    if membership is None:
+        raise ValidationError("You are not a member of this organization.")
+
+    if membership.role == Membership.Role.OWNER:
+        raise ValidationError(
+            "The organization owner cannot leave. Transfer ownership first."
+        )
+
+    membership.delete()

@@ -18,14 +18,18 @@ from .serializers import (
     InvitationDetailSerailizer,
     InvitationSerializer,
     MembershipSerializer,
+    MembershipUpdateSerializer,
     OrganizationCreateSerializer,
     OrganizationSerializer,
 )
 from .services import (
     accept_invitation,
+    change_member_role,
     create_invitation,
     create_organization,
     decline_invitation,
+    leave_organization,
+    remove_member,
 )
 
 
@@ -154,6 +158,18 @@ class InvitationDeclineView(generics.GenericAPIView):
         )
 
 
+class InvitationDetailView(generics.RetrieveAPIView):
+    serializer_class = InvitationDetailSerailizer
+    permission_classes = [AllowAny]
+    lookup_field = "token"
+
+    def get_queryset(self):
+        return Invitation.objects.select_related(
+            "organization",
+            "invited_by",
+        )
+
+
 class MembershipListView(generics.ListAPIView):
     serializer_class = MembershipSerializer
     permission_classes = [
@@ -215,13 +231,79 @@ class MembershipDetailView(generics.RetrieveUpdateDestroyAPIView):
         return membership
 
 
-class InvitationDetailView(generics.RetrieveAPIView):
-    serializer_class = InvitationDetailSerailizer
-    permission_classes = [AllowAny]
-    lookup_field = "token"
+class MembershipUpdateView(generics.UpdateAPIView):
+    serializer_class = MembershipUpdateSerializer
+    permission_classes = [IsAuthenticated, IsMembershipManager]
 
     def get_queryset(self):
-        return Invitation.objects.select_related(
+        return Membership.objects.select_related(
+            "user",
             "organization",
-            "invited_by",
+        ).filter(
+            organization_id=self.kwargs["organization_id"],
+        )
+
+    def perform_update(self, serializer):
+        membership = self.get_object()
+
+        try:
+            self.membership = change_member_role(
+                membership=membership,
+                actor=self.request.user,
+                new_role=serializers.validated_data["role"],
+            )
+        except ValidationError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+
+    def update(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        self.perform_update(serializer)
+
+        return Response(
+            MembershipSerializer(self.membership).data,
+        )
+
+
+class MembershipDeleteView(generics.DestroyAPIView):
+    permission_classes = [
+        IsAuthenticated,
+        IsMembershipManager,
+    ]
+
+    def get_queryset(self):
+        return Membership.objects.filter(
+            organization_id=self.kwargs["organization_id"],
+        )
+
+    def perform_destroy(self, instance):
+        try:
+            remove_member(
+                membership=instance,
+                actor=self.request.user,
+            )
+        except ValidationError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+
+
+class OrganizationLeaveView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, organization_id):
+        organization = get_object_or_404(
+            Organization,
+            id=organization_id,
+        )
+
+        try:
+            leave_organization(
+                organization=organization,
+                user=request.user,
+            )
+        except ValidationError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+
+        return Response(
+            {"detail": "You have left the organization."}, status=status.HTTP_200_OK
         )
