@@ -17,7 +17,9 @@ from .views import (
 urlpatterns = [
     path("register/", RegisterView.as_view(), name="register"),
     path(
-        "verify-email/<uidb64>/<token>/", VerifyEmailView.as_view(), name="verify-email"
+        "verify-email/<str:uidb64>/<str:token>/",
+        VerifyEmailView.as_view(),
+        name="verify-email",
     ),
     path(
         "resend-verification/",
@@ -26,7 +28,7 @@ urlpatterns = [
     ),
     path("forgot-password/", ForgotPasswordView.as_view(), name="forgot-password"),
     path(
-        "reset-password/<uidb64>/<token>/",
+        "reset-password/<str:uidb64>/<str:token>/",
         ResetPasswordView.as_view(),
         name="password-reset",
     ),

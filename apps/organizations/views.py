@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, serializers, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -113,9 +114,12 @@ class InvitationCreateView(generics.CreateAPIView):
         )
 
 
+@extend_schema(
+    request=None,
+    responses={201: MembershipSerializer},
+)
 class InvitationAcceptView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
-    serializer_class = MembershipSerializer
 
     def post(self, request, token):
         invitation = get_object_or_404(
@@ -138,6 +142,10 @@ class InvitationAcceptView(generics.GenericAPIView):
         )
 
 
+@extend_schema(
+    request=None,
+    responses={200: serializers.Serializer()},
+)
 class InvitationDeclineView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
@@ -194,8 +202,13 @@ class MembershipListView(generics.ListAPIView):
 
 
 class MembershipDetailView(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = MembershipSerializer
     queryset = Membership.objects.select_related("user", "organization")
+
+    def get_serializer_class(self):
+        if self.request.method in ["PUT", "PATCH"]:
+            return MembershipUpdateSerializer
+
+        return MembershipSerializer
 
     def get_permissions(self):
         if self.request.method == "GET":
@@ -230,52 +243,15 @@ class MembershipDetailView(generics.RetrieveUpdateDestroyAPIView):
 
         return membership
 
-
-class MembershipUpdateView(generics.UpdateAPIView):
-    serializer_class = MembershipUpdateSerializer
-    permission_classes = [IsAuthenticated, IsMembershipManager]
-
-    def get_queryset(self):
-        return Membership.objects.select_related(
-            "user",
-            "organization",
-        ).filter(
-            organization_id=self.kwargs["organization_id"],
-        )
-
     def perform_update(self, serializer):
-        membership = self.get_object()
-
         try:
-            self.membership = change_member_role(
-                membership=membership,
+            change_member_role(
+                membership=self.get_object(),
                 actor=self.request.user,
-                new_role=serializers.validated_data["role"],
+                new_role=serializer.validated_data["role"],
             )
         except ValidationError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
-
-    def update(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        self.perform_update(serializer)
-
-        return Response(
-            MembershipSerializer(self.membership).data,
-        )
-
-
-class MembershipDeleteView(generics.DestroyAPIView):
-    permission_classes = [
-        IsAuthenticated,
-        IsMembershipManager,
-    ]
-
-    def get_queryset(self):
-        return Membership.objects.filter(
-            organization_id=self.kwargs["organization_id"],
-        )
 
     def perform_destroy(self, instance):
         try:
@@ -288,6 +264,7 @@ class MembershipDeleteView(generics.DestroyAPIView):
 
 
 class OrganizationLeaveView(generics.GenericAPIView):
+    serializer_class = None
     permission_classes = [IsAuthenticated]
 
     def post(self, request, organization_id):
