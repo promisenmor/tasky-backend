@@ -63,6 +63,16 @@ class MembershipSerializer(serializers.ModelSerializer):
         read_only=True,
     )
 
+    organization_id = serializers.UUIDField(
+        source="organization.id",
+        read_only=True,
+    )
+
+    organization_name = serializers.CharField(
+        source="organization.name",
+        read_only=True,
+    )
+
     class Meta:
         model = Membership
         fields = [
@@ -71,14 +81,17 @@ class MembershipSerializer(serializers.ModelSerializer):
             "email",
             "full_name",
             "initials",
+            "organization_id",
+            "organization_name",
             "role",
             "joined_at",
         ]
         read_only_fields = [
             "id",
             "user_id",
+            "organization_id",
+            "organization_name",
             "email",
-            "full_nameinitials",
             "joined_at",
         ]
 
@@ -181,7 +194,7 @@ class InvitationDetailSerailizer(serializers.ModelSerializer):
         model = Invitation
         fields = [
             "id",
-            "organization_name",
+            "organization",
             "invited_by_name",
             "email",
             "role",
