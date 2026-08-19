@@ -113,12 +113,12 @@ def decline_invitation(*, invitation, user):
     invitation.save(update_fields=["declined_at", "updated_at"])
 
 
-# Membership activites
+# Membership activities
 @transaction.atomic
 def change_member_role(*, membership, actor, new_role):
     actor_membership = Membership.objects.get(
         user=actor,
-        organization=Membership.organization,
+        organization=membership.organization,
     )
 
     if membership.role == Membership.Role.OWNER:
