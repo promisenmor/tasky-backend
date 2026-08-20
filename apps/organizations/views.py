@@ -288,3 +288,34 @@ class OrganizationLeaveView(generics.GenericAPIView):
         return Response(
             {"detail": "You have left the organization."}, status=status.HTTP_200_OK
         )
+
+
+# Remp View
+class MembershipActivityView(generics.GenericAPIView):
+    queryset = Membership.objects.select_related("user", "organization")
+    serializer_class = MembershipSerializer
+    permission_classes = [IsAuthenticated, IsOrganizationMember]
+
+    def get_object(self):
+        organization = get_object_or_404(
+            Organization,
+            id=self.kwargs["organization_id"],
+        )
+
+        membership = get_object_or_404(
+            Membership.objects.select_related("user", "organization"),
+            id=self.kwargs["membership_id"],
+            organization=organization,
+        )
+
+        self.check_object_permissions(
+            self.request,
+            membership,
+        )
+
+        return membership
+
+    def get(self, request, *args, **kwargs):
+        membership = self.get_object()
+        serializer = self.get_serializer(membership)
+        return Response(serializer.data)
