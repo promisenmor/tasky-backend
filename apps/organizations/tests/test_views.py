@@ -191,3 +191,49 @@ def test_organization_detail_non_member_cannot_access(user):
     )
 
     assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_update_membership_role_returns_updated_role(user):
+    organization = Organization.objects.create(
+        name="Tasky",
+        slug="tasky",
+    )
+    Membership.objects.create(
+        user=user,
+        organization=organization,
+        role=Membership.Role.OWNER,
+    )
+
+    target_user = User.objects.create_user(
+        email="member@example.com",
+        first_name="Member",
+        last_name="User",
+        password="testpassword123",
+    )
+    membership = Membership.objects.create(
+        user=target_user,
+        organization=organization,
+        role=Membership.Role.MEMBER,
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    response = client.patch(
+        reverse(
+            "detail-member",
+            kwargs={
+                "organization_id": organization.id,
+                "membership_id": membership.id,
+            },
+        ),
+        {"role": Membership.Role.ADMIN},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert response.data["role"] == Membership.Role.ADMIN
+
+    membership.refresh_from_db()
+    assert membership.role == Membership.Role.ADMIN
