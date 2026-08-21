@@ -244,10 +244,10 @@ class MembershipDetailView(generics.RetrieveUpdateDestroyAPIView):
         return membership
 
     def perform_update(self, serializer):
-        membership = self.get_object()
+        membership = serializer.instance
 
         try:
-            change_member_role(
+            updated_membership = change_member_role(
                 membership=membership,
                 actor=self.request.user,
                 new_role=serializer.validated_data["role"],
@@ -255,7 +255,8 @@ class MembershipDetailView(generics.RetrieveUpdateDestroyAPIView):
         except ValidationError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
 
-        membership.refresh_from_db()
+        serializer.instance = updated_membership
+        updated_membership.refresh_from_db()
 
     def perform_destroy(self, instance):
         try:
