@@ -66,6 +66,63 @@ class Membership(models.Model):
         return f"{self.user.email} → {self.organization.name}"
 
 
+class Team(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="teams"
+    )
+    name = models.CharField(
+        max_length=150,
+    )
+    description = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_teams"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "teams"
+        ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "name"],
+                name="unique_team_name_per_organization",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.organization.name} → {self.name}"
+
+
+class TeamMembership(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    team = models.ForeignKey(
+        Team,
+        on_delete=models.CASCADE,
+        related_name="memberships",
+    )
+    membership = models.ForeignKey(
+        Membership, on_delete=models.CASCADE, related_name="team_memberships"
+    )
+    joined_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    class Meta:
+        db_table = "team_memberships"
+        ordering = ["joined_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["teams", "membership"],
+                name="unique_team_membership",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.membership.user.email} → {self.team.name}"
+
+
 class Invitation(models.Model):
     class Role(models.TextChoices):
         ADMIN = "ADMIN", "Admin"
