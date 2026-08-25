@@ -114,7 +114,7 @@ class TeamMembership(models.Model):
         ordering = ["joined_at"]
         constraints = [
             models.UniqueConstraint(
-                fields=["teams", "membership"],
+                fields=["team", "membership"],
                 name="unique_team_membership",
             ),
         ]
