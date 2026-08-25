@@ -2,7 +2,12 @@ from rest_framework import serializers
 
 from apps.accounts.models import User
 
-from .models import Invitation, Membership, Organization
+from .models import (
+    Invitation,
+    Membership,
+    Organization,
+    Team,
+)
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
@@ -208,3 +213,41 @@ class InvitationDetailSerailizer(serializers.ModelSerializer):
 
     def get_requires_registration(self, obj):
         return not User.objects.filter(email__iexact=obj.email).exists()
+
+
+class TeamSerailizer(serializers.ModelSerializer):
+    organization_name = serializers.CharField(
+        source="organization.name", read_only=True
+    )
+    created_by_email = serializers.EmailField(
+        source="created_by.email",
+        read_only=True,
+    )
+    member_count = serializers.IntegerField(
+        source="memberships.count",
+        read_only=True,
+    )
+
+    class Meta:
+        model = Team
+        fields = [
+            "id",
+            "organization",
+            "organization_name",
+            "name",
+            "description",
+            "created_by",
+            "created_by_email",
+            "member_count",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "organization",
+            "organization_name",
+            "created_bycreated_by_email",
+            "member_count",
+            "created_at",
+            "updated_at",
+        ]

@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from apps.organizations.tasks import send_invitation_email_task
 
-from .models import Invitation, Membership, Organization
+from .models import Invitation, Membership, Organization, Team
 
 INVITATION_EXPIRATION_HOURS = 72
 
@@ -183,3 +183,14 @@ def leave_organization(*, organization, user):
         )
 
     membership.delete()
+
+
+# team operations
+@transaction.atomic
+def create_team(*, organization, created_by, name, description=""):
+    return Team.objects.create(
+        organization=organization,
+        created_by=created_by,
+        name=name,
+        description=description,
+    )
