@@ -6,7 +6,8 @@ from django.utils import timezone
 
 from apps.organizations.tasks import send_invitation_email_task
 
-from .models import Invitation, Membership, Organization, Team
+from .models import Invitation, Membership, Organization, Team, TeamMembership
+from .permissions import is_organization_admin
 
 INVITATION_EXPIRATION_HOURS = 72
 
@@ -188,9 +189,66 @@ def leave_organization(*, organization, user):
 # team operations
 @transaction.atomic
 def create_team(*, organization, created_by, name, description=""):
+    name = name.strip()
+    description = description.strip()
+
     return Team.objects.create(
         organization=organization,
         created_by=created_by,
         name=name,
         description=description,
     )
+
+
+@transaction.atomic
+def update_team(*, team, name=None, description=None):
+    if name is not None:
+        team.name = name.strip()
+    if description is not None:
+        team.description = description.strip()
+    team.save(update_fields=["name", "description", "updated_at"])
+    return team
+
+
+@transaction.atomic
+def delete_team(*, team):
+    team.delete()
+
+
+@transaction.atomic
+def add_team_member(*, team, membership, actor):
+    # check if actor is authorized to add members to the team
+
+    if not is_organization_admin(user=actor, organization=team.organization):
+        raise ValidationError("You do not have permission to add members to this team.")
+
+    if membership.organization_id != team.organization_id:
+        raise ValidationError(
+            "Membership does not belong to the same organization as the team."
+        )
+
+    if TeamMembership.objects.filter(team=team, membership=membership).exists():
+        raise ValidationError("This member is already part of the team.")
+
+    return TeamMembership.objects.create(team=team, membership=membership)
+
+
+@transaction.atomic
+def remove_team_member(*, team, membership, actor):
+    if not is_organization_admin(user=actor, organization=team.organization):
+        raise ValidationError(
+            "You do not have permission to remove members from this team."
+        )
+
+    if membership.organization_id != team.organization_id:
+        raise ValidationError(
+            "Membership does not belong to the same organization as the team."
+        )
+
+    team_membership = TeamMembership.objects.filter(
+        team=team, membership=membership
+    ).first()
+    if not team_membership:
+        raise ValidationError("This member is not part of the team.")
+
+    team_membership.delete()

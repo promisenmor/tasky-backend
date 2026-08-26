@@ -2,12 +2,7 @@ from rest_framework import serializers
 
 from apps.accounts.models import User
 
-from .models import (
-    Invitation,
-    Membership,
-    Organization,
-    Team,
-)
+from .models import Invitation, Membership, Organization, Team, TeamMembership
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
@@ -250,4 +245,107 @@ class TeamSerailizer(serializers.ModelSerializer):
             "member_count",
             "created_at",
             "updated_at",
+        ]
+
+
+class TeamSerializer(serializers.ModelSerializer):
+    organization_name = serializers.CharField(
+        source="organization.name",
+        read_only=True,
+    )
+    created_by_email = serializers.EmailField(
+        source="created_by.email",
+        read_only=True,
+    )
+    member_count = serializers.IntegerField(
+        read_only=True,
+    )
+
+    class Meta:
+        model = Team
+        fields = [
+            "id",
+            "organization_name",
+            "name",
+            "description",
+            "created_by",
+            "created_by_email",
+            "member_count",
+            "created_at",
+            "updated_by",
+        ]
+        read_only_fields = [
+            "id",
+            "organization_name",
+            "created_by",
+            "created_by_email",
+            "member_count",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class TeamCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Team
+        fields = [
+            "name",
+            "description",
+        ]
+
+    def validated_name(self, value):
+        value = value.strip()
+
+        if not value:
+            raise serializers.ValidationError("Team name cannot be empty.")
+        return value
+
+
+class TeamMemberSerializer(serializers.ModelSerializer):
+    membership_id = serializers.UUIDField(
+        source="membership.id",
+        read_Only=True,
+    )
+    user_id = serializers.UUIDField(
+        source="membership.user.id",
+        read_only=True,
+    )
+    email = serializers.EmailField(
+        source="membership.user.email",
+        read_only=True,
+    )
+    full_name = serializers.CharField(
+        source="membership.user.full_name",
+        read_only=True,
+    )
+    initials = serializers.CharField(
+        source="membership.user.initials",
+        read_only=True,
+    )
+    organization_role = serializers.CharField(
+        source="membership.role",
+        read_only=True,
+    )
+
+    class Meta:
+        model = TeamMembership
+        fields = [
+            "id",
+            "membership_id",
+            "user_id",
+            "email",
+            "full_name",
+            "initials",
+            "organization_role",
+            "joined_at",
+        ]
+        read_only_fields = [
+            "id",
+            "membership_id",
+            "user_id",
+            "email",
+            "full_name",
+            "initials",
+            "organization_role",
+            "joined_at",
         ]

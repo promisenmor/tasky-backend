@@ -53,3 +53,15 @@ class IsMembershipManager(BasePermission):
             Membership.Role.OWNER,
             Membership.Role.ADMIN,
         }
+
+
+def is_organization_admin(*, user, organization):
+    """check if a user is an admin or owner of an organization."""
+    return Membership.objects.filter(
+        user=user,
+        organization=organization,
+        role__in=[
+            Membership.Role.OWNER,
+            Membership.Role.ADMIN,
+        ],
+    ).exists()
