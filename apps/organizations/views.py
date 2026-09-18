@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, serializers, status
@@ -9,6 +10,8 @@ from .models import (
     Invitation,
     Membership,
     Organization,
+    Team,
+    TeamMembership,
 )
 from .permissions import (
     IsMembershipManager,
@@ -22,15 +25,23 @@ from .serializers import (
     MembershipUpdateSerializer,
     OrganizationCreateSerializer,
     OrganizationSerializer,
+    TeamCreateSerializer,
+    TeamMemberCreateSerializer,
+    TeamMemberSerializer,
+    TeamSerailizer,
 )
 from .services import (
     accept_invitation,
+    add_team_member,
     change_member_role,
     create_invitation,
     create_organization,
+    create_team,
     decline_invitation,
+    delete_team,
     leave_organization,
     remove_member,
+    update_team,
 )
 
 
@@ -289,3 +300,235 @@ class OrganizationLeaveView(generics.GenericAPIView):
         return Response(
             {"detail": "You have left the organization."}, status=status.HTTP_200_OK
         )
+
+
+# Team views
+class TeamListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated, IsOrganizationMember]
+
+    def get_queryset(self):
+        organization = get_object_or_404(
+            Organization,
+            id=self.kwargs["organization_id"],
+        )
+
+        self.check_object_permissions(
+            self.request,
+            organization,
+        )
+
+        return (
+            Team.objects.filter(organization=organization)
+            .select_related("organization", "created_by")
+            .annotate(member_count=Count("memberships"))
+        )
+
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return TeamCreateSerializer
+
+        return TeamSerailizer
+
+    def create(self, request, *args, **kwargs):
+        organization = get_object_or_404(
+            Organization,
+            id=self.kwargs["organization_id"],
+        )
+
+        self.check_object_permissions(
+            request,
+            organization,
+        )
+
+        serializer = self.get_serializer(
+            data=request.data,
+        )
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            team = create_team(
+                organization=organization,
+                created_by=request.user,
+                **serializer.validated_data,
+            )
+        except ValidationError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+
+        return Response(
+            TeamSerailizer(team).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class TeamDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return (
+            Team.objects.filter(
+                organization_id=self.kwargs["organization_id"],
+            )
+            .select_related("organization", "created_by")
+            .annotate(member_count=Count("memberships"))
+        )
+
+    def get_serializer_class(self):
+        if self.request.method in ["PUT", "PATCH"]:
+            return TeamCreateSerializer
+
+        return TeamSerailizer
+
+    def get_object(self):
+        team = super().get_object()
+
+        if self.request.method in ["PUT", "PATCH", "DELETE"]:
+            self.check_object_permissions(
+                self.request,
+                team.organization,
+            )
+            return team
+
+        membership = Membership.objects.filter(
+            user=self.request.user,
+            organization=team.organization,
+        ).exists()
+
+        if not membership:
+            raise self.permission_denied("You are not a member of this organization.")
+
+        return team
+
+    def update(self, request, *args, **kwargs):
+        team = self.get_object()
+
+        serializer = self.get_serializer(
+            instance=team,
+            data=request.data,
+            partial=kwargs.pop("partial", False),
+        )
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            team = update_team(
+                team=team,
+                actor=request.user,
+                **serializer.validated_data,
+            )
+        except ValidationError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+
+        return Response(
+            TeamSerailizer(team).data,
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        team = self.get_object()
+
+        try:
+            delete_team(
+                team=team,
+                actor=request.user,
+            )
+        except ValidationError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+
+        return Response(
+            status=status.HTTP_204_NO_CONTENT,
+        )
+
+
+class TeamMemberListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_team(self):
+        team = get_object_or_404(
+            Team.objects.select_related("organization"),
+            id=self.kwargs["team_id"],
+            organization_id=self.kwargs["organization_id"],
+        )
+
+        self.check_object_permissions(
+            self.request,
+            team.oragnization,
+        )
+
+        return team
+
+    def get_queryset(self):
+        team = self.get_team()
+
+        return TeamMembership.objects.filter(team=team).select_related(
+            "membership__user",
+            "membership__organization",
+        )
+
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return TeamMemberCreateSerializer
+        return TeamMemberSerializer
+
+    def create(self, request, *args, **kwargs):
+        team = self.get_team()
+        self.check_object_permissions(request, team.organization)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        membership = get_object_or_404(
+            Membership,
+            id=serializer.validated_data["membership_id"],
+        )
+
+        try:
+            team_membership = add_team_member(
+                team=team,
+                membership=membership,
+                actor=request.user,
+            )
+
+        except ValidationError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+
+        return Response(
+            TeamMemberSerializer(team_membership).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class TeamMemberDeleteView(generics.DestroyAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        team = self.get_object_or_404(
+            Team,
+            id=self.kwargs["team_id"],
+            organization_id=self.kwargs["organization_id"],
+        )
+
+        self.check_object_permissions(
+            self.request,
+            team.organization,
+        )
+
+        membership = get_object_or_404(
+            Membership,
+            id=self.kwargs["membership_id"],
+        )
+
+        team_membership = get_object_or_404(
+            TeamMembership,
+            team=team,
+            membership=membership,
+        )
+
+        return team_membership
+
+    def perform_destroy(self, instance):
+        try:
+            remove_member(
+                team=instance.team,
+                membership=instance.membership,
+                actor=self.request.user,
+            )
+        except ValidationError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc

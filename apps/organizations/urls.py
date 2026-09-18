@@ -11,6 +11,10 @@ from .views import (
     OrganizationDetailView,
     OrganizationLeaveView,
     OrganizationListView,
+    TeamDetailView,
+    TeamListCreateView,
+    TeamMemberDeleteView,
+    TeamMemberListCreateView,
 )
 
 urlpatterns = [
@@ -68,5 +72,27 @@ urlpatterns = [
         "<uuid:organization_id>/leave/",
         OrganizationLeaveView.as_view(),
         name="organization-leave",
+    ),
+    # teams
+    path(
+        "<uuid:organization_id>/teams/",
+        TeamListCreateView.as_view(),
+        name="team-list-create",
+    ),
+    path(
+        "<uuid:organization_id>/teams/<uuid:pk>/",
+        TeamDetailView.as_view(),
+        name="team-detail",
+    ),
+    # team member
+    path(
+        "<uuid:organization_id>/teams/<uuid:team_id>/members/",
+        TeamMemberListCreateView.as_view(),
+        name="team-member-list-create",
+    ),
+    path(
+        "<uuid:organization_id>/teams/<uuid:team_id>/members/<uuid:membership_id>/",
+        TeamMemberDeleteView.as_view(),
+        name="team-member-delete",
     ),
 ]

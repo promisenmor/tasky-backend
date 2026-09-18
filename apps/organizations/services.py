@@ -201,17 +201,20 @@ def create_team(*, organization, created_by, name, description=""):
 
 
 @transaction.atomic
-def update_team(*, team, name=None, description=None):
+def update_team(*, team, actor, name=None, description=None):
     if name is not None:
         team.name = name.strip()
+
     if description is not None:
         team.description = description.strip()
+
     team.save(update_fields=["name", "description", "updated_at"])
+
     return team
 
 
 @transaction.atomic
-def delete_team(*, team):
+def delete_team(*, team, actor):
     team.delete()
 
 
