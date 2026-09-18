@@ -188,16 +188,28 @@ def leave_organization(*, organization, user):
 
 # team operations
 @transaction.atomic
-def create_team(*, organization, created_by, name, description=""):
+def create_team(*, organization, created_by, name, team, description=""):
     name = name.strip()
     description = description.strip()
 
-    return Team.objects.create(
+    membership = Membership.objects.get(
+        organization=organization,
+        user=created_by,
+    )
+
+    team = Team.objects.create(
         organization=organization,
         created_by=created_by,
         name=name,
         description=description,
     )
+
+    TeamMembership.objects.create(
+        team=team,
+        membership=membership,
+    )
+
+    return team
 
 
 @transaction.atomic
