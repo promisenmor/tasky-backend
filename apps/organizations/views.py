@@ -41,6 +41,7 @@ from .services import (
     delete_team,
     leave_organization,
     remove_member,
+    remove_team_member,
     update_team,
 )
 
@@ -449,7 +450,7 @@ class TeamMemberListCreateView(generics.ListCreateAPIView):
 
         self.check_object_permissions(
             self.request,
-            team.oragnization,
+            team.organization,
         )
 
         return team
@@ -499,7 +500,7 @@ class TeamMemberDeleteView(generics.DestroyAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_object(self):
-        team = self.get_object_or_404(
+        team = get_object_or_404(
             Team,
             id=self.kwargs["team_id"],
             organization_id=self.kwargs["organization_id"],
@@ -513,6 +514,7 @@ class TeamMemberDeleteView(generics.DestroyAPIView):
         membership = get_object_or_404(
             Membership,
             id=self.kwargs["membership_id"],
+            organization=team.organization,
         )
 
         team_membership = get_object_or_404(
@@ -525,7 +527,7 @@ class TeamMemberDeleteView(generics.DestroyAPIView):
 
     def perform_destroy(self, instance):
         try:
-            remove_member(
+            remove_team_member(
                 team=instance.team,
                 membership=instance.membership,
                 actor=self.request.user,
