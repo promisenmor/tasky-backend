@@ -219,7 +219,6 @@ class TeamSerailizer(serializers.ModelSerializer):
         read_only=True,
     )
     member_count = serializers.IntegerField(
-        source="memberships.count",
         read_only=True,
     )
 
@@ -240,42 +239,6 @@ class TeamSerailizer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "organization",
-            "organization_name",
-            "created_bycreated_by_email",
-            "member_count",
-            "created_at",
-            "updated_at",
-        ]
-
-
-class TeamSerializer(serializers.ModelSerializer):
-    organization_name = serializers.CharField(
-        source="organization.name",
-        read_only=True,
-    )
-    created_by_email = serializers.EmailField(
-        source="created_by.email",
-        read_only=True,
-    )
-    member_count = serializers.IntegerField(
-        read_only=True,
-    )
-
-    class Meta:
-        model = Team
-        fields = [
-            "id",
-            "organization_name",
-            "name",
-            "description",
-            "created_by",
-            "created_by_email",
-            "member_count",
-            "created_at",
-            "updated_by",
-        ]
-        read_only_fields = [
-            "id",
             "organization_name",
             "created_by",
             "created_by_email",
@@ -304,7 +267,7 @@ class TeamCreateSerializer(serializers.ModelSerializer):
 class TeamMemberSerializer(serializers.ModelSerializer):
     membership_id = serializers.UUIDField(
         source="membership.id",
-        read_Only=True,
+        read_only=True,
     )
     user_id = serializers.UUIDField(
         source="membership.user.id",
@@ -349,3 +312,7 @@ class TeamMemberSerializer(serializers.ModelSerializer):
             "organization_role",
             "joined_at",
         ]
+
+
+class TeamMemberCreateSerializer(serializers.Serializer):
+    membership_id = serializers.UUIDField()
