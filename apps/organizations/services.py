@@ -267,3 +267,32 @@ def remove_team_member(*, team, membership, actor):
         raise ValidationError("This member is not part of the team.")
 
     team_membership.delete()
+
+
+# Role Management
+@transaction.atomic
+def update_membership_role(*, membership, actor, new_role):
+    if membership.role == Membership.Role.OWNER:
+        raise ValidationError("The organization owner cannot have their role changed.")
+
+    if new_role == Membership.Role.OWNER:
+        raise ValidationError("Ownership cannot be assigned through this operation.")
+
+    actor_membership = Membership.objects.get(
+        user=actor,
+        organization=membership.organization,
+    )
+
+    if actor_membership.role == Membership.Role.MEMBER:
+        raise ValidationError("Members cannot change their membership roles.")
+
+    if (
+        actor_membership.role == Membership.Role.ADMIN
+        and membership.role == Membership.Role.ADMIN
+    ):
+        raise ValidationError("Admins cannot change another admins's role")
+
+    membership.role = new_role
+    membership.save(update_fields=["role"])
+
+    return membership
