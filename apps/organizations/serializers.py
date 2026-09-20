@@ -175,7 +175,7 @@ class InvitationSerializer(serializers.ModelSerializer):
         ]
 
 
-class InvitationDetailSerailizer(serializers.ModelSerializer):
+class InvitationDetailSerializer(serializers.ModelSerializer):
     organization = serializers.CharField(
         source="organization.name",
         read_only=True,
@@ -210,7 +210,7 @@ class InvitationDetailSerailizer(serializers.ModelSerializer):
         return not User.objects.filter(email__iexact=obj.email).exists()
 
 
-class TeamSerailizer(serializers.ModelSerializer):
+class TeamSerializer(serializers.ModelSerializer):
     organization_name = serializers.CharField(
         source="organization.name", read_only=True
     )
@@ -247,6 +247,18 @@ class TeamSerailizer(serializers.ModelSerializer):
             "updated_at",
         ]
 
+    def validate_name(self, value):
+        organization = self.context["organization"]
+        qs = Team.objects.filter(organization=organization, name__iexact=value)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "A team with this name already exists in the organization."
+            )
+
+        return value
+
 
 class TeamCreateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -256,11 +268,21 @@ class TeamCreateSerializer(serializers.ModelSerializer):
             "description",
         ]
 
-    def validated_name(self, value):
+    def validate_name(self, value):
         value = value.strip()
 
         if not value:
             raise serializers.ValidationError("Team name cannot be empty.")
+
+        organization = self.context["organization"]
+        if Team.objects.filter(
+            organization=organization,
+            name__iexact=value,
+        ).exists():
+            raise serializers.ValidationError(
+                "A team with this name already exists in the organization."
+            )
+
         return value
 
 

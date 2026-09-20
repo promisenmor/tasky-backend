@@ -8,10 +8,13 @@ class IsOrganizationMember(BasePermission):
     Allows access only to users who are members of the organization.
     """
 
+    message = "You must be a member of this organization."
+
     def has_object_permission(self, request, view, obj):
+        organization = getattr(obj, "organization", obj)
         return Membership.objects.filter(
             user=request.user,
-            organization=obj,
+            organization=organization,
         ).exists()
 
 
@@ -20,10 +23,13 @@ class IsOrganizationAdmin(BasePermission):
     Allows organization owners and admins
     """
 
+    message = "You must be an admin or owner of this organization."
+
     def has_object_permission(self, request, view, obj):
+        organization = getattr(obj, "organization", obj)
         membership = Membership.objects.filter(
             user=request.user,
-            organization=obj,
+            organization=organization,
         ).first()
 
         if membership is None:
@@ -39,6 +45,10 @@ class IsMembershipManager(BasePermission):
     """
     Allows organization owners and admins to manage memberships.
     """
+
+    message = (
+        "You must be an admin or owner of this organization to manage memberships."
+    )
 
     def has_object_permission(self, request, view, obj):
         requester_membership = Membership.objects.filter(

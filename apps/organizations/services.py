@@ -188,7 +188,7 @@ def leave_organization(*, organization, user):
 
 # team operations
 @transaction.atomic
-def create_team(*, organization, created_by, name, team, description=""):
+def create_team(*, organization, created_by, name, description=""):
     name = name.strip()
     description = description.strip()
 
