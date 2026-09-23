@@ -338,3 +338,12 @@ class TeamMemberSerializer(serializers.ModelSerializer):
 
 class TeamMemberCreateSerializer(serializers.Serializer):
     membership_id = serializers.UUIDField()
+
+
+class MembershipRoleUpdateSerializer(serializers.Serializer):
+    role = serializers.ChoiceField(
+        choices=[
+            Membership.Role.ADMIN,
+            Membership.Role.MEMBER,
+        ]
+    )
