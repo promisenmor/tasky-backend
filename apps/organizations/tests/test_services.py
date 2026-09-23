@@ -22,6 +22,7 @@ from apps.organizations.services import (
     decline_invitation,
     delete_team,
     remove_team_member,
+    update_membership_role,
     update_team,
 )
 
@@ -999,4 +1000,114 @@ def test_remove_team_member_not_in_team_rejected(user, organization):
             team=team,
             membership=member_membership,
             actor=user,
+        )
+
+
+@pytest.mark.django_db
+def test_admin_can_promote_member_to_admin(organization):
+    admin_user = User.objects.create(
+        email="admin@example.com",
+        first_name="admin",
+        last_name="user",
+        password="testpassword",
+    )
+
+    member_user = User.objects.create(
+        email="member@example.com",
+        first_name="member",
+        last_name="user",
+        password="testpassword123",
+    )
+
+    Membership.objects.create(
+        user=admin_user,
+        organization=organization,
+        role=Membership.Role.ADMIN,
+    )
+
+    member_membership = Membership.objects.create(
+        user=member_user,
+        organization=organization,
+        role=Membership.Role.MEMBER,
+    )
+
+    updated = update_membership_role(
+        membership=member_membership,
+        actor=admin_user,
+        new_role=Membership.Role.ADMIN,
+    )
+
+    assert updated.role == Membership.Role.ADMIN
+    member_membership.refresh_from_db()
+    assert member_membership.role == member_membership.Role.ADMIN
+
+
+@pytest.mark.django_db
+def test_member_cannot_change_role(organization):
+    actor_user = User.objects.create(
+        email="actor@example.com",
+        first_name="actor",
+        last_name="user",
+        password="testpassword123",
+    )
+
+    target_user = User.objects.create(
+        email="target@example.com",
+        first_name="target",
+        last_name="user",
+        password="testpassword123",
+    )
+
+    Membership.objects.create(
+        user=actor_user,
+        organization=organization,
+        role=Membership.Role.MEMBER,
+    )
+
+    target = Membership.objects.create(
+        user=target_user,
+        organization=organization,
+        role=Membership.Role.MEMBER,
+    )
+
+    with pytest.raises(
+        ValidationError, match="Members cannot change their membership roles."
+    ):
+        update_membership_role(
+            membership=target, actor=actor_user, new_role=Membership.Role.ADMIN
+        )
+
+        target.refresh_from_db()
+        assert target.role == Membership.Role.ADMIN
+
+
+@pytest.mark.django_db
+def test_admin_cannot_change_another_admin(organization):
+    admin1 = User.objects.create(
+        email="admin1@example.com",
+        first_name="admina",
+        last_name="user",
+        password="testpassword123",
+    )
+
+    admin2 = User.objects.create(
+        email="admin2@example.com",
+        first_name="admininn",
+        last_name="user",
+        password="testpassword123",
+    )
+
+    Membership.objects.create(
+        user=admin1, organization=organization, role=Membership.Role.ADMIN
+    )
+
+    admin2 = Membership.objects.create(
+        user=admin2, organization=organization, role=Membership.Role.ADMIN
+    )
+
+    with pytest.raises(
+        ValidationError, match="Admins cannot change another admins's role"
+    ):
+        update_membership_role(
+            membership=admin2, actor=admin1, new_role=Membership.Role.MEMBER
         )
