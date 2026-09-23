@@ -23,6 +23,7 @@ from .serializers import (
     InvitationCreateSerializer,
     InvitationDetailSerializer,
     InvitationSerializer,
+    MembershipRoleUpdateSerializer,
     MembershipSerializer,
     MembershipUpdateSerializer,
     OrganizationCreateSerializer,
@@ -44,6 +45,7 @@ from .services import (
     leave_organization,
     remove_member,
     remove_team_member,
+    update_membership_role,
     update_team,
 )
 
@@ -553,3 +555,34 @@ class TeamMemberDeleteView(generics.DestroyAPIView):
             )
         except ValidationError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
+
+
+class TeamMembershipUpdateRoleView(generics.UpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = MembershipRoleUpdateSerializer
+
+    def get_object(self):
+        return Membership.objects.select_related(
+            "organization",
+            "user",
+        ).get(
+            id=self.kwargs["membership_id"],
+            organization_id=self.kwargs["organization_id"],
+        )
+
+    def patch(self, request, *args, **kwargs):
+        membership = self.get_object()
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        membership = update_membership_role(
+            membership=membership,
+            role=serializer.validated_data["role"],
+            actor=request.user,
+        )
+
+        return Response(
+            MembershipSerializer(membership).data,
+            status=status.HTTP_200_OK,
+        )

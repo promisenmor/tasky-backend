@@ -1111,3 +1111,53 @@ def test_admin_cannot_change_another_admin(organization):
         update_membership_role(
             membership=admin2, actor=admin1, new_role=Membership.Role.MEMBER
         )
+
+
+@pytest.mark.django_db
+def test_cannot_change_owner_role(organization):
+    owner_user = User.objects.create(
+        email="owner@example.com",
+        first_name="owner",
+        last_name="user",
+        password="testpassword123",
+    )
+
+    Membership.objects.create(
+        user=owner_user,
+        organization=organization,
+        role=Membership.Role.OWNER,
+    )
+
+    with pytest.raises(
+        ValidationError, match="The organization owner cannot have their role changed."
+    ):
+        update_membership_role(
+            membership=Membership.objects.get(user=owner_user),
+            actor=owner_user,
+            new_role=Membership.Role.ADMIN,
+        )
+
+
+@pytest.mark.django_db
+def test_cannot_promote_member_to_owner(organization):
+    member_user = User.objects.create(
+        email="member@example.com",
+        first_name="member",
+        last_name="user",
+        password="testpassword123",
+    )
+
+    Membership.objects.create(
+        user=member_user, organization=organization, role=Membership.Role.MEMBER
+    )
+
+    with pytest.raises(
+        ValidationError, match="Ownership cannot be assigned through this operation."
+    ):
+        update_membership_role(
+            membership=Membership.objects.get(
+                user=member_user, organization=organization
+            ),
+            actor=member_user,
+            new_role=Membership.Role.OWNER,
+        )
