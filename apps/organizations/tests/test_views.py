@@ -706,3 +706,281 @@ def test_team_detail_cannot_access_team_from_wrong_organization(
     response = api_client.get(url)
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_admin_can_promote_member(
+    api_client,
+    organization,
+):
+    admin_user = User.objects.create_user(
+        email="admin@example.com",
+        first_name="Admin",
+        last_name="User",
+        password="testpassword123",
+    )
+
+    member_user = User.objects.create_user(
+        email="member@example.com",
+        first_name="Member",
+        last_name="User",
+        password="testpassword123",
+    )
+
+    Membership.objects.create(
+        user=admin_user,
+        organization=organization,
+        role=Membership.Role.ADMIN,
+    )
+
+    member = Membership.objects.create(
+        user=member_user,
+        organization=organization,
+        role=Membership.Role.MEMBER,
+    )
+
+    api_client.force_authenticate(user=admin_user)
+
+    url = reverse(
+        "team-member-update-role",
+        kwargs={
+            "organization_id": organization.id,
+            "team_id": team.id,
+            "membership_id": member.id,
+        },
+    )
+
+    response = api_client.patch(
+        url,
+        {"role": Membership.Role.ADMIN},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+    member.refresh_from_db()
+    assert member.role == Membership.Role.ADMIN
+
+
+@pytest.mark.django_db
+def test_member_cannot_change_role(
+    api_client,
+    organization,
+    team,
+):
+    actor_user = User.objects.create(
+        email="actor@example.com",
+        first_name="Actor",
+        last_name="User",
+        password="testpassword123",
+    )
+
+    target_user = User.objects.create(
+        email="target@example.com",
+        first_name="Target",
+        last_name="User",
+        password="testpassword123",
+    )
+
+    Membership.objects.create(
+        user=actor_user,
+        organization=organization,
+        role=Membership.Role.MEMBER,
+    )
+
+    target = Membership.objects.create(
+        user=target_user,
+        organization=organization,
+        role=Membership.Role.MEMBER,
+    )
+
+    api_client.force_authenticate(user=actor_user)
+
+    url = reverse(
+        "team-member-update-role",
+        kwargs={
+            "organization_id": organization.id,
+            "team_id": team.id,
+            "membership_id": target.id,
+        },
+    )
+
+    response = api_client.patch(
+        url,
+        {"role": Membership.Role.ADMIN},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    target.refresh_from_db()
+
+    assert target.role == Membership.Role.MEMBER
+
+
+@pytest.mark.django_db
+def test_admin_cannot_change_another_admin(
+    api_client,
+    organization,
+    team,
+):
+    actor_user = User.objects.create(
+        email="admin1@example.com",
+        first_name="Admin",
+        last_name="One",
+        password="testpassword123",
+    )
+
+    target_user = User.objects.create(
+        email="admin2@example.com",
+        first_name="Admin",
+        last_name="Two",
+        password="testpassword123",
+    )
+
+    Membership.objects.create(
+        user=actor_user,
+        organization=organization,
+        role=Membership.Role.ADMIN,
+    )
+
+    target = Membership.objects.create(
+        user=target_user,
+        organization=organization,
+        role=Membership.Role.ADMIN,
+    )
+
+    api_client.force_authenticate(user=actor_user)
+
+    url = reverse(
+        "team-member-update-role",
+        kwargs={
+            "organization_id": organization.id,
+            "team_id": team.id,
+            "membership_id": target.id,
+        },
+    )
+
+    response = api_client.patch(
+        url,
+        {"role": Membership.Role.MEMBER},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    target.refresh_from_db()
+
+    assert target.role == Membership.Role.ADMIN
+
+
+@pytest.mark.django_db
+def test_owner_role_cannot_be_changed(
+    api_client,
+    organization,
+    team,
+):
+    admin_user = User.objects.create(
+        email="admin@example.com",
+        first_name="Admin",
+        last_name="User",
+        password="testpassword123",
+    )
+
+    owner_user = User.objects.create(
+        email="owner@example.com",
+        first_name="Owner",
+        last_name="User",
+        password="testpassword123",
+    )
+
+    Membership.objects.create(
+        user=admin_user,
+        organization=organization,
+        role=Membership.Role.ADMIN,
+    )
+
+    owner = Membership.objects.create(
+        user=owner_user,
+        organization=organization,
+        role=Membership.Role.OWNER,
+    )
+
+    api_client.force_authenticate(user=admin_user)
+
+    url = reverse(
+        "team-member-update-role",
+        kwargs={
+            "organization_id": organization.id,
+            "team_id": team.id,
+            "membership_id": owner.id,
+        },
+    )
+
+    response = api_client.patch(
+        url,
+        {"role": Membership.Role.ADMIN},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    owner.refresh_from_db()
+
+    assert owner.role == Membership.Role.OWNER
+
+
+@pytest.mark.django_db
+def test_cannot_promote_member_to_owner(
+    api_client,
+    organization,
+    team,
+):
+    admin_user = User.objects.create(
+        email="admin@example.com",
+        first_name="Admin",
+        last_name="User",
+        password="testpassword123",
+    )
+
+    member_user = User.objects.create(
+        email="member@example.com",
+        first_name="Member",
+        last_name="User",
+        password="testpassword123",
+    )
+
+    Membership.objects.create(
+        user=admin_user,
+        organization=organization,
+        role=Membership.Role.ADMIN,
+    )
+
+    member = Membership.objects.create(
+        user=member_user,
+        organization=organization,
+        role=Membership.Role.MEMBER,
+    )
+
+    api_client.force_authenticate(user=admin_user)
+
+    url = reverse(
+        "team-member-update-role",
+        kwargs={
+            "organization_id": organization.id,
+            "team_id": team.id,
+            "membership_id": member.id,
+        },
+    )
+
+    response = api_client.patch(
+        url,
+        {"role": Membership.Role.OWNER},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    member.refresh_from_db()
+
+    assert member.role == Membership.Role.MEMBER
