@@ -3,6 +3,7 @@ from datetime import timedelta
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
+from rest_framework.exceptions import PermissionDenied
 
 from apps.organizations.tasks import send_invitation_email_task
 
@@ -272,25 +273,37 @@ def remove_team_member(*, team, membership, actor):
 # Role Management
 @transaction.atomic
 def update_membership_role(*, membership, actor, new_role):
+    # Prevent changing the owner's role at all
     if membership.role == Membership.Role.OWNER:
         raise ValidationError("The organization owner cannot have their role changed.")
 
+    # Prevent assigning ownership through this operation
     if new_role == Membership.Role.OWNER:
         raise ValidationError("Ownership cannot be assigned through this operation.")
 
-    actor_membership = Membership.objects.get(
-        user=actor,
-        organization=membership.organization,
-    )
+    # No-op short-circuit
+    if membership.role == new_role:
+        return membership
 
+    # Actor must belong to the same organization
+    try:
+        actor_membership = Membership.objects.get(
+            user=actor,
+            organization=membership.organization,
+        )
+    except Membership.DoesNotExist:
+        raise PermissionDenied("You must be a member of the organization.") from None
+
+    # Members cannot change roles
     if actor_membership.role == Membership.Role.MEMBER:
-        raise ValidationError("Members cannot change their membership roles.")
+        raise PermissionDenied("Members cannot change membership roles.")
 
+    # Admins cannot modify other admins
     if (
         actor_membership.role == Membership.Role.ADMIN
         and membership.role == Membership.Role.ADMIN
     ):
-        raise ValidationError("Admins cannot change another admins's role")
+        raise PermissionDenied("Admins cannot change another admin's role.")
 
     membership.role = new_role
     membership.save(update_fields=["role"])

@@ -578,7 +578,7 @@ class TeamMembershipUpdateRoleView(generics.UpdateAPIView):
 
         membership = update_membership_role(
             membership=membership,
-            role=serializer.validated_data["role"],
+            new_role=serializer.validated_data["role"],
             actor=request.user,
         )
 
