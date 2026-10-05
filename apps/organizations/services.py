@@ -231,6 +231,7 @@ def delete_team(*, team, actor):
     team.delete()
 
 
+# Team Role Management
 @transaction.atomic
 def add_team_member(*, team, membership, actor):
     # check if actor is authorized to add members to the team
@@ -270,7 +271,6 @@ def remove_team_member(*, team, membership, actor):
     team_membership.delete()
 
 
-# Role Management
 @transaction.atomic
 def update_membership_role(*, membership, actor, new_role):
     # Prevent changing the owner's role at all

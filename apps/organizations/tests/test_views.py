@@ -712,16 +712,17 @@ def test_team_detail_cannot_access_team_from_wrong_organization(
 def test_admin_can_promote_member(
     api_client,
     organization,
+    team,
 ):
     admin_user = User.objects.create_user(
-        email="admin@example.com",
+        email="role-admin@example.com",
         first_name="Admin",
         last_name="User",
         password="testpassword123",
     )
 
     member_user = User.objects.create_user(
-        email="member@example.com",
+        email="role-member@example.com",
         first_name="Member",
         last_name="User",
         password="testpassword123",
@@ -769,14 +770,14 @@ def test_member_cannot_change_role(
     team,
 ):
     actor_user = User.objects.create(
-        email="actor@example.com",
+        email="role-actor@example.com",
         first_name="Actor",
         last_name="User",
         password="testpassword123",
     )
 
     target_user = User.objects.create(
-        email="target@example.com",
+        email="role-target@example.com",
         first_name="Target",
         last_name="User",
         password="testpassword123",
@@ -825,14 +826,14 @@ def test_admin_cannot_change_another_admin(
     team,
 ):
     actor_user = User.objects.create(
-        email="admin1@example.com",
+        email="role-admin1@example.com",
         first_name="Admin",
         last_name="One",
         password="testpassword123",
     )
 
     target_user = User.objects.create(
-        email="admin2@example.com",
+        email="role-admin2@example.com",
         first_name="Admin",
         last_name="Two",
         password="testpassword123",
@@ -867,7 +868,7 @@ def test_admin_cannot_change_another_admin(
         format="json",
     )
 
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
     target.refresh_from_db()
 
@@ -881,14 +882,14 @@ def test_owner_role_cannot_be_changed(
     team,
 ):
     admin_user = User.objects.create(
-        email="admin@example.com",
+        email="role-admin@example.com",
         first_name="Admin",
         last_name="User",
         password="testpassword123",
     )
 
     owner_user = User.objects.create(
-        email="owner@example.com",
+        email="role-owner@example.com",
         first_name="Owner",
         last_name="User",
         password="testpassword123",
