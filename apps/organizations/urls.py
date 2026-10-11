@@ -1,0 +1,104 @@
+from django.urls import path
+
+from .views import (
+    InvitationAcceptView,
+    InvitationCreateView,
+    InvitationDeclineView,
+    InvitationDetailView,
+    MembershipDetailView,
+    MembershipListView,
+    OrganizationCreateView,
+    OrganizationDetailView,
+    OrganizationLeaveView,
+    OrganizationListView,
+    TeamDetailView,
+    TeamListCreateView,
+    TeamMemberDeleteView,
+    TeamMemberListCreateView,
+    TeamMembershipUpdateRoleView,
+)
+
+urlpatterns = [
+    path(
+        "",
+        OrganizationListView.as_view(),
+        name="organization-list",
+    ),
+    path(
+        "create/",
+        OrganizationCreateView.as_view(),
+        name="create-organization",
+    ),
+    path(
+        "<uuid:pk>/",
+        OrganizationDetailView.as_view(),
+        name="organization-detail",
+    ),
+    path(
+        "<uuid:organization_id>/invitations/",
+        InvitationCreateView.as_view(),
+        name="create-invitation",
+    ),
+    path(
+        "<uuid:organization_id>/members/",
+        MembershipListView.as_view(),
+        name="list-members",
+    ),
+    path(
+        "<uuid:organization_id>/members/<uuid:membership_id>/",
+        MembershipDetailView.as_view(),
+        name="detail-member",
+    ),
+    path(
+        "invitations/<uuid:token>/accept/",
+        InvitationAcceptView.as_view(),
+        name="invitation-accept",
+    ),
+    path(
+        "invitations/<uuid:token>/decline/",
+        InvitationDeclineView.as_view(),
+        name="invitation-decline",
+    ),
+    path(
+        "invitations/<uuid:token>/",
+        InvitationDetailView.as_view(),
+        name="invitation-detail",
+    ),
+    #   path(
+    #       "<uuid:organization_id>/members/<uuid:pk>/",
+    #       MembershipUpdateView.as_view(),
+    #       name="membership-update",
+    #  ),
+    path(
+        "<uuid:organization_id>/leave/",
+        OrganizationLeaveView.as_view(),
+        name="organization-leave",
+    ),
+    # teams
+    path(
+        "<uuid:organization_id>/teams/",
+        TeamListCreateView.as_view(),
+        name="team-list-create",
+    ),
+    path(
+        "<uuid:organization_id>/teams/<uuid:pk>/",
+        TeamDetailView.as_view(),
+        name="team-detail",
+    ),
+    # team member
+    path(
+        "<uuid:organization_id>/teams/<uuid:team_id>/members/",
+        TeamMemberListCreateView.as_view(),
+        name="team-member-list-create",
+    ),
+    path(
+        "<uuid:organization_id>/teams/<uuid:team_id>/members/<uuid:membership_id>/",
+        TeamMemberDeleteView.as_view(),
+        name="team-member-delete",
+    ),
+    path(
+        "<uuid:organization_id>/teams/<uuid:team_id>/members/<uuid:membership_id>/role/",
+        TeamMembershipUpdateRoleView.as_view(),
+        name="team-member-update-role",
+    ),
+]

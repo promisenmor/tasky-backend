@@ -1,0 +1,311 @@
+from datetime import timedelta
+
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.utils import timezone
+from rest_framework.exceptions import PermissionDenied
+
+from apps.organizations.tasks import send_invitation_email_task
+
+from .models import Invitation, Membership, Organization, Team, TeamMembership
+from .permissions import is_organization_admin
+
+INVITATION_EXPIRATION_HOURS = 72
+
+
+@transaction.atomic
+def create_organization(*, user, name, slug, description=""):
+    organization = Organization.objects.create(
+        name=name,
+        slug=slug,
+        description=description,
+    )
+
+    Membership.objects.create(
+        user=user,
+        organization=organization,
+        role=Membership.Role.OWNER,
+    )
+
+    return organization
+
+
+@transaction.atomic
+def create_invitation(*, organization, invited_by, email, role):
+    email = email.lower().strip()
+
+    existing_membership = Membership.objects.filter(
+        organization=organization,
+        user__email__iexact=email,
+    ).exists()
+
+    if existing_membership:
+        raise ValidationError("This user is already a member of the organization.")
+
+    if Invitation.objects.filter(
+        organization=organization,
+        email__iexact=email,
+        accepted_at__isnull=True,
+        expires_at__gt=timezone.now(),
+    ).exists():
+        raise ValidationError("A pending invitation already exists for this email.")
+
+    invitation = Invitation.objects.create(
+        organization=organization,
+        email=email,
+        role=role,
+        invited_by=invited_by,
+        expires_at=timezone.now() + timedelta(hours=INVITATION_EXPIRATION_HOURS),
+    )
+
+    transaction.on_commit(lambda: send_invitation_email_task.delay(invitation.id))
+
+    return invitation
+
+
+@transaction.atomic
+def accept_invitation(*, invitation, user):
+    if invitation.accepted_at is not None:
+        raise ValidationError("This invitation has already been accepted.")
+
+    if invitation.declined_at is not None:
+        raise ValidationError("This invitation has already been declined.")
+
+    if invitation.expires_at < timezone.now():
+        raise ValidationError("This invitation has expired.")
+
+    if invitation.email.lower() != user.email.lower():
+        raise ValidationError("This invitation is not for the current user.")
+
+    existing_membership = Membership.objects.filter(
+        organization=invitation.organization,
+        user=user,
+    ).exists()
+
+    if existing_membership:
+        raise ValidationError("This user is already a member of the organization.")
+
+    membership = Membership.objects.create(
+        user=user,
+        organization=invitation.organization,
+        role=invitation.role,
+    )
+
+    invitation.accepted_at = timezone.now()
+    invitation.save(update_fields=["accepted_at", "updated_at"])
+
+    return membership
+
+
+@transaction.atomic
+def decline_invitation(*, invitation, user):
+    if invitation.accepted_at is not None:
+        raise ValidationError("This invitation has already been accepted.")
+
+    if invitation.is_declined:
+        raise ValidationError("This invitation has already been declined.")
+
+    if invitation.is_expired:
+        raise ValidationError("This invitation has expired.")
+
+    if invitation.email.lower() != user.email.lower():
+        raise ValidationError("This invitation was sent to a different address.")
+
+    invitation.declined_at = timezone.now()
+    invitation.save(update_fields=["declined_at", "updated_at"])
+
+
+# Membership activities
+@transaction.atomic
+def change_member_role(*, membership, actor, new_role):
+    actor_membership = Membership.objects.get(
+        user=actor,
+        organization=membership.organization,
+    )
+
+    if membership.role == Membership.Role.OWNER:
+        raise ValidationError("The organization owner cannot have their role changed.")
+
+    if new_role == Membership.Role.OWNER:
+        raise ValidationError("Ownership cannot be assigned through this operation.")
+
+    if actor_membership.role == Membership.Role.MEMBER:
+        raise ValidationError("Members cannot change their membership roles.")
+
+    if (
+        actor_membership.role == Membership.Role.ADMIN
+        and membership.role == Membership.Role.ADMIN
+    ):
+        raise ValidationError("Admins cannot change another admins's role")
+
+    membership.role = new_role
+    membership.save(update_fields=["role"])
+
+    return membership
+
+
+@transaction.atomic
+def remove_member(*, membership, actor):
+    actor_membership = Membership.objects.get(
+        user=actor,
+        organization=membership.organization,
+    )
+
+    if membership.role == Membership.Role.OWNER:
+        raise ValidationError("The organization owner cannot be removed.")
+
+    if actor_membership.role == Membership.Role.MEMBER:
+        raise ValidationError("Members cannot remove other members.")
+
+    if (
+        actor_membership.role == Membership.Role.ADMIN
+        and membership.role == Membership.Role.ADMIN
+    ):
+        raise ValidationError("Admins cannot remove other admins.")
+
+    if membership.user_id == actor.id:
+        raise ValidationError("use the leave organization endpoint to leave.")
+
+    membership.delete()
+
+
+@transaction.atomic
+def leave_organization(*, organization, user):
+    membership = Membership.objects.filter(
+        organization=organization,
+        user=user,
+    ).first()
+
+    if membership is None:
+        raise ValidationError("You are not a member of this organization.")
+
+    if membership.role == Membership.Role.OWNER:
+        raise ValidationError(
+            "The organization owner cannot leave. Transfer ownership first."
+        )
+
+    membership.delete()
+
+
+# team operations
+@transaction.atomic
+def create_team(*, organization, created_by, name, description=""):
+    name = name.strip()
+    description = description.strip()
+
+    membership = Membership.objects.get(
+        organization=organization,
+        user=created_by,
+    )
+
+    team = Team.objects.create(
+        organization=organization,
+        created_by=created_by,
+        name=name,
+        description=description,
+    )
+
+    TeamMembership.objects.create(
+        team=team,
+        membership=membership,
+    )
+
+    return team
+
+
+@transaction.atomic
+def update_team(*, team, actor, name=None, description=None):
+    if name is not None:
+        team.name = name.strip()
+
+    if description is not None:
+        team.description = description.strip()
+
+    team.save(update_fields=["name", "description", "updated_at"])
+
+    return team
+
+
+@transaction.atomic
+def delete_team(*, team, actor):
+    team.delete()
+
+
+# Team Role Management
+@transaction.atomic
+def add_team_member(*, team, membership, actor):
+    # check if actor is authorized to add members to the team
+
+    if not is_organization_admin(user=actor, organization=team.organization):
+        raise ValidationError("You do not have permission to add members to this team.")
+
+    if membership.organization_id != team.organization_id:
+        raise ValidationError(
+            "Membership does not belong to the same organization as the team."
+        )
+
+    if TeamMembership.objects.filter(team=team, membership=membership).exists():
+        raise ValidationError("This member is already part of the team.")
+
+    return TeamMembership.objects.create(team=team, membership=membership)
+
+
+@transaction.atomic
+def remove_team_member(*, team, membership, actor):
+    if not is_organization_admin(user=actor, organization=team.organization):
+        raise ValidationError(
+            "You do not have permission to remove members from this team."
+        )
+
+    if membership.organization_id != team.organization_id:
+        raise ValidationError(
+            "Membership does not belong to the same organization as the team."
+        )
+
+    team_membership = TeamMembership.objects.filter(
+        team=team, membership=membership
+    ).first()
+    if not team_membership:
+        raise ValidationError("This member is not part of the team.")
+
+    team_membership.delete()
+
+
+@transaction.atomic
+def update_membership_role(*, membership, actor, new_role):
+    # Prevent changing the owner's role at all
+    if membership.role == Membership.Role.OWNER:
+        raise ValidationError("The organization owner cannot have their role changed.")
+
+    # Prevent assigning ownership through this operation
+    if new_role == Membership.Role.OWNER:
+        raise ValidationError("Ownership cannot be assigned through this operation.")
+
+    # No-op short-circuit
+    if membership.role == new_role:
+        return membership
+
+    # Actor must belong to the same organization
+    try:
+        actor_membership = Membership.objects.get(
+            user=actor,
+            organization=membership.organization,
+        )
+    except Membership.DoesNotExist:
+        raise PermissionDenied("You must be a member of the organization.") from None
+
+    # Members cannot change roles
+    if actor_membership.role == Membership.Role.MEMBER:
+        raise PermissionDenied("Members cannot change membership roles.")
+
+    # Admins cannot modify other admins
+    if (
+        actor_membership.role == Membership.Role.ADMIN
+        and membership.role == Membership.Role.ADMIN
+    ):
+        raise PermissionDenied("Admins cannot change another admin's role.")
+
+    membership.role = new_role
+    membership.save(update_fields=["role"])
+
+    return membership
