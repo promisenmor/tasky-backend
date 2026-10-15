@@ -30,3 +30,12 @@ def other_organization():
         slug="other-organization",
         description="Another test organization.",
     )
+
+
+@pytest.fixture
+def project(organization, user):
+    return organization.projects.create(
+        name="Test Project",
+        description="A test project.",
+        created_by=user,
+    )
