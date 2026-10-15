@@ -109,3 +109,35 @@ def update_project(
         ) from exc
 
     return project
+
+
+@transaction.atomic
+def archive_project(*, project: Project, actor) -> Project:
+    """Archive a project."""
+
+    if not is_organization_admin(
+        user=actor,
+        organization=project.organization,
+    ):
+        raise ValidationError("You must be an admin or owner of this organization.")
+
+    project.status = Project.Status.ARCHIVED
+    project.save(update_fields=["status", "updated_at"])
+
+    return project
+
+
+@transaction.atomic
+def restore_project(*, project: Project, actor) -> Project:
+    """Restore an archieved project"""
+
+    if not is_organization_admin(
+        user=actor,
+        organization=project.organization,
+    ):
+        raise ValidationError("You must be an admin or owner of this organization.")
+
+    project.status = Project.Status.ACTIVE
+    project.save(update_fields=["status", "updated_at"])
+
+    return project

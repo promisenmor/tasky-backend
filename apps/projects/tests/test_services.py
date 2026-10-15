@@ -3,7 +3,12 @@ from django.core.exceptions import ValidationError
 
 from apps.organizations.models import Membership
 from apps.projects.models import Project
-from apps.projects.services import create_project, update_project
+from apps.projects.services import (
+    archive_project,
+    create_project,
+    restore_project,
+    update_project,
+)
 
 
 @pytest.mark.django_db
@@ -414,3 +419,132 @@ def test_update_project_rejects_duplicate_name(organization, user):
 
     project.refresh_from_db()
     assert project.name == "Another Project"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "role",
+    [Membership.Role.OWNER, Membership.Role.ADMIN],
+)
+def test_owner_and_admin_can_archieve_project(organization, user, role):
+    Membership.objects.update_or_create(
+        user=user,
+        organization=organization,
+        defaults={"role": Membership.Role.OWNER},
+    )
+    project = create_project(
+        organization=organization,
+        created_by=user,
+        name="Project to archive",
+    )
+    Membership.objects.filter(
+        user=user,
+        organization=organization,
+    ).update(role=role)
+
+    archived = archive_project(project=project, actor=user)
+
+    assert archived.status == Project.Status.ARCHIVED
+    project.refresh_from_db()
+    assert project.status == Project.Status.ARCHIVED
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "role",
+    [Membership.Role.MEMBER, None],
+    ids=["regular-member", "Non-member"],
+)
+def test_member_and_non_member_cannot_archive_project(organization, user, role):
+    Membership.objects.update_or_create(
+        user=user,
+        organization=organization,
+        defaults={"role": Membership.Role.OWNER},
+    )
+    project = create_project(
+        organization=organization,
+        created_by=user,
+        name="Protected project",
+    )
+
+    membership = Membership.objects.filter(
+        user=user,
+        organization=organization,
+    )
+    if role is None:
+        membership.delete()
+    else:
+        membership.update(role=role)
+
+    with pytest.raises(ValidationError):
+        archive_project(project=project, actor=user)
+
+    project.refresh_from_db()
+    assert project.status == Project.Status.ACTIVE
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "role",
+    [Membership.Role.OWNER, Membership.Role.ADMIN],
+)
+def test_owner_and_admin_can_restore_project(organization, user, role):
+    Membership.objects.update_or_create(
+        user=user,
+        organization=organization,
+        defaults={"role": Membership.Role.OWNER},
+    )
+    project = create_project(
+        organization=organization,
+        created_by=user,
+        name="Project to restore",
+    )
+    project.status = Project.Status.ARCHIVED
+    project.save(update_fields=["status"])
+
+    Membership.objects.filter(
+        user=user,
+        organization=organization,
+    ).update(role=role)
+
+    restored = restore_project(project=project, actor=user)
+
+    assert restored.status == Project.Status.ACTIVE
+    project.refresh_from_db()
+    assert project.status == Project.Status.ACTIVE
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "role",
+    [Membership.Role.MEMBER, None],
+    ids=["regular-member", "non-member"],
+)
+def test_member_and_non_member_cannot_restore_project(organization, user, role):
+    Membership.objects.update_or_create(
+        user=user,
+        organization=organization,
+        defaults={"role": Membership.Role.OWNER},
+    )
+    project = create_project(
+        organization=organization,
+        created_by=user,
+        name="Protected archived project",
+    )
+    project.status = Project.Status.ARCHIVED
+    project.save(update_fields=["status"])
+
+    membership = Membership.objects.filter(
+        user=user,
+        organization=organization,
+    )
+    if role is None:
+        membership.delete()
+    else:
+        membership.update(role=role)
+
+    with pytest.raises(ValidationError):
+        restore_project(project=project, actor=user)
+
+    project.refresh_from_db()
+    assert project.status == Project.Status.ARCHIVED
