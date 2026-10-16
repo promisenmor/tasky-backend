@@ -19,4 +19,5 @@ urlpatterns = [
     # API endpoints
     path("api/v1/accounts/", include("apps.accounts.urls")),
     path("api/v1/organizations/", include("apps.organizations.urls")),
+    path("api/v1/projects/", include("apps.projects.urls")),
 ]
