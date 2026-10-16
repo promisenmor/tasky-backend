@@ -6,6 +6,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.organizations.models import Organization
+from apps.organizations.permissions import (
+    IsOrganizationAdmin,
+    IsOrganizationMember,
+)
 from apps.projects.models import Project
 from apps.projects.serializers import (
     ProjectCreateSerializer,
@@ -18,12 +22,13 @@ from apps.projects.services import (
 
 class ProjectListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
+    pagination_class = None  # Disable pagination for this view
 
     def get_permissions(self):
         if self.request.method == "POST":
-            return ProjectCreateSerializer
+            return [IsAuthenticated(), IsOrganizationAdmin()]
 
-        return ProjectSerializer
+        return [IsAuthenticated(), IsOrganizationMember()]
 
     def _get_organization(self):
         organization = get_object_or_404(
@@ -33,6 +38,12 @@ class ProjectListCreateView(generics.ListCreateAPIView):
 
         self.check_object_permissions(self.request, organization)
         return organization
+
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return ProjectCreateSerializer
+
+        return ProjectSerializer
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
