@@ -16,7 +16,10 @@ from apps.projects.serializers import (
     ProjectSerializer,
 )
 from apps.projects.services import (
+    archive_project,
     create_project,
+    restore_project,
+    update_project,
 )
 
 
@@ -86,3 +89,111 @@ class ProjectListCreateView(generics.ListCreateAPIView):
             raise serializers.ValidationError({"detail": str(exc)}) from exc
 
         return Response(ProjectSerializer(project).data, status=status.HTTP_201_CREATED)
+
+
+class ProjectDetailView(generics.RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ProjectSerializer
+
+    def get_permissions(self):
+        if self.request.method in ["PATCH", "PUT"]:
+            permission_classes = [
+                IsAuthenticated,
+                IsOrganizationAdmin,
+            ]
+        else:
+            permission_classes = [
+                IsAuthenticated,
+                IsOrganizationMember,
+            ]
+
+        return [permission() for permission in permission_classes]
+
+    def get_queryset(self):
+        return Project.objects.filter(
+            organization_id=self.kwargs["organization_id"],
+        ).select_related("organization", "created_by")
+
+    def get_object(self):
+        organization = get_object_or_404(
+            Organization,
+            id=self.kwargs["organization_id"],
+        )
+
+        self.check_object_permissions(self.request, organization)
+
+        return get_object_or_404(
+            self.get_queryset(),
+            id=self.kwargs["project_id"],
+            organization=organization,
+        )
+
+    def update(self, request, *args, **kwargs):
+        project = self.get_object()
+
+        serializer = self.get_serializer(
+            project,
+            data=request.data,
+            partial=kwargs.pop("partial", False),
+            context=self.get_serializer_context(),
+        )
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            project = update_project(
+                project=project,
+                actor=request.user,
+                **serializer.validated_data,
+            )
+        except ValidationError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+
+        return Response(ProjectSerializer(project).data)
+
+
+class ProjectArchiveView(generics.GenericAPIView):
+    permission_classes = [
+        IsAuthenticated,
+        IsOrganizationAdmin,
+    ]
+
+    def post(self, request, organization_id, project_id):
+        project = self.get_project(request, organization_id, project_id)
+
+        try:
+            project = archive_project(
+                project=project,
+                actor=request.user,
+            )
+        except ValidationError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+
+        return Response(ProjectSerializer(project).data, status=status.HTTP_200_OK)
+
+    def get_project(self, request, organization_id, project_id):
+        organization = get_object_or_404(
+            Organization,
+            id=organization_id,
+        )
+        self.check_object_permissions(request, organization)
+
+        return get_object_or_404(
+            Project.objects.select_related("organization", "created_by"),
+            id=project_id,
+            organization=organization,
+        )
+
+
+class ProjectRestoreView(ProjectArchiveView):
+    def post(self, request, organization_id, project_id):
+        project = self.get_project(request, organization_id, project_id)
+
+        try:
+            project = restore_project(
+                project=project,
+                actor=request.user,
+            )
+        except ValidationError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+
+        return Response(ProjectSerializer(project).data, status=status.HTTP_200_OK)
