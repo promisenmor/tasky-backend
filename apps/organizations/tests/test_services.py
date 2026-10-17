@@ -1071,7 +1071,7 @@ def test_member_cannot_change_role(organization):
     )
 
     with pytest.raises(
-        ValidationError, match="Members cannot change their membership roles."
+        ValidationError, match="Members cannot change membership roles."
     ):
         update_membership_role(
             membership=target, actor=actor_user, new_role=Membership.Role.ADMIN
@@ -1106,7 +1106,7 @@ def test_admin_cannot_change_another_admin(organization):
     )
 
     with pytest.raises(
-        ValidationError, match="Admins cannot change another admins's role"
+        ValidationError, match="Admins cannot change another admin's role"
     ):
         update_membership_role(
             membership=admin2, actor=admin1, new_role=Membership.Role.MEMBER

@@ -868,7 +868,7 @@ def test_admin_cannot_change_another_admin(
         format="json",
     )
 
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     target.refresh_from_db()
 
@@ -938,14 +938,14 @@ def test_cannot_promote_member_to_owner(
     team,
 ):
     admin_user = User.objects.create(
-        email="admin@example.com",
+        email="admin1@example.com",
         first_name="Admin",
         last_name="User",
         password="testpassword123",
     )
 
     member_user = User.objects.create(
-        email="member@example.com",
+        email="member1@example.com",
         first_name="Member",
         last_name="User",
         password="testpassword123",

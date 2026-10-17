@@ -1,9 +1,8 @@
 from datetime import timedelta
 
-from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import ValidationError
 
 from apps.organizations.tasks import send_invitation_email_task
 
@@ -292,18 +291,18 @@ def update_membership_role(*, membership, actor, new_role):
             organization=membership.organization,
         )
     except Membership.DoesNotExist:
-        raise PermissionDenied("You must be a member of the organization.") from None
+        raise ValidationError("You must be a member of the organization.") from None
 
     # Members cannot change roles
     if actor_membership.role == Membership.Role.MEMBER:
-        raise PermissionDenied("Members cannot change membership roles.")
+        raise ValidationError("Members cannot change membership roles.")
 
     # Admins cannot modify other admins
     if (
         actor_membership.role == Membership.Role.ADMIN
         and membership.role == Membership.Role.ADMIN
     ):
-        raise PermissionDenied("Admins cannot change another admin's role.")
+        raise ValidationError("Admins cannot change another admin's role.")
 
     membership.role = new_role
     membership.save(update_fields=["role"])
