@@ -3,11 +3,12 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import User
 from apps.organizations.models import Membership, Organization
+from apps.projects.models import Section
 
 
 @pytest.fixture
 def user(organization):
-    return User.objects.create_user(
+    user = User.objects.create_user(
         email="test@example.com",
         password="Testpassword123!",
         first_name="Test",
@@ -98,4 +99,13 @@ def non_member_user(django_user_model):
         first_name="Non",
         last_name="Member",
         password="password",
+    )
+
+
+@pytest.fixture
+def section(project):
+    return Section.objects.create(
+        project=project,
+        name="backlog",
+        description="Tasks waiting to be started.",
     )
