@@ -2,9 +2,9 @@ from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
-from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.utils import timezone
+from rest_framework.exceptions import ValidationError
 
 from apps.accounts.models import User
 from apps.organizations.models import (
