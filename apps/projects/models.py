@@ -39,3 +39,27 @@ class Project(models.Model):
 
     def __str__(self):
         return f"{self.organization.name} - {self.name}"
+
+
+class Section(models.Model):
+    id = models.UUIDField(default=uuid4, primary_key=True, editable=-False)
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE, related_name="sections"
+    )
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
+    position = models.PositiveIntegerField(default=0)
+    created_at = models.TimeField(auto_now_add=True)
+    updated_at = models.TimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "name"],
+                name="unique_section_per_project",
+            ),
+        ]
+        ordering = ["position", "created_at"]
+
+    def __str__(self):
+        return f"{self.project.name} - {self.name}"
