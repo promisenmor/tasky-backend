@@ -3,6 +3,7 @@ import pytest
 from apps.projects.serializers import (
     ProjectCreateSerializer,
     ProjectSerializer,
+    SectionSerializer,
 )
 
 
@@ -132,3 +133,101 @@ def test_project_serializer_allows_unchanged_name(
     )
 
     assert serializer.is_valid(), serializer.errors
+
+
+@pytest.mark.django_db
+def test_project_serializer_returns_expected_fields(project):
+    serializer = ProjectSerializer(instance=project)
+
+    expected_fields = {
+        "id",
+        "organization",
+        "organization_name",
+        "name",
+        "description",
+        "status",
+        "created_by",
+        "created_by_email",
+        "created_at",
+        "updated_at",
+    }
+
+    assert set(serializer.data.keys()) == expected_fields
+
+
+@pytest.mark.django_db
+def test_project_serializer_validates_name():
+    serializer = ProjectSerializer(data={"name": "  My Project  "})
+
+    assert serializer.is_valid()
+    assert serializer.validated_data["name"] == "My Project"
+
+
+@pytest.mark.django_db
+def test_project_serializer_rejects_empty_name():
+    serializer = ProjectSerializer(data={"name": "   "})
+
+    assert not serializer.is_valid()
+    assert "name" in serializer.errors
+
+
+@pytest.mark.django_db
+def test_project_serializer_strips_description():
+    serializer = ProjectSerializer(
+        data={
+            "name": "My Project",
+            "description": "  Project description  ",
+        }
+    )
+
+    assert serializer.is_valid()
+    assert serializer.validated_data["description"] == "Project description"
+
+
+# Section tests
+
+
+@pytest.mark.django_db
+def test_section_serializer_returns_expected_fields(section):
+    serializer = SectionSerializer(instance=section)
+
+    expected_fields = {
+        "id",
+        "project",
+        "name",
+        "description",
+        "position",
+        "created_at",
+        "updated_at",
+    }
+
+    assert set(serializer.data.keys()) == expected_fields
+
+
+@pytest.mark.django_db
+def test_section_serializer_validates_name():
+    serializer = SectionSerializer(data={"name": "  Backlog  "})
+
+    assert serializer.is_valid()
+    assert serializer.validated_data["name"] == "Backlog"
+
+
+@pytest.mark.django_db
+def test_section_serializer_rejects_empty_name():
+    serializer = SectionSerializer(data={"name": "   "})
+
+    assert not serializer.is_valid()
+    assert "name" in serializer.errors
+
+
+@pytest.mark.django_db
+def test_section_serializer_strips_description():
+    serializer = SectionSerializer(
+        data={
+            "name": "Backlog",
+            "description": "  Tasks waiting to start.  ",
+        }
+    )
+
+    assert serializer.is_valid()
+    assert serializer.validated_data["description"] == "Tasks waiting to start."

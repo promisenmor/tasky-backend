@@ -2,17 +2,16 @@ import pytest
 from django.urls import reverse
 from rest_framework import status
 
-from apps.organizations.models import Membership
-from apps.projects.models import Project
+from apps.projects.models import Project, Section
 
 
 @pytest.mark.django_db
 def test_owner_can_create_project(api_client, organization, user):
-    Membership.objects.create(
-        user=user,
-        organization=organization,
-        role=Membership.Role.OWNER,
-    )
+    # Membership.objects.create(
+    #     user=user,
+    #     organization=organization,
+    #     role=Membership.Role.OWNER,
+    # )
     api_client.force_authenticate(user=user)
     url = reverse("project-list-create", args=[organization.id])
     data = {
@@ -276,3 +275,361 @@ def test_member_cannot_update_project(api_client, member_user, organization, pro
 
     project.refresh_from_db()
     assert project.name != "Unauthorized Update"
+
+
+# Section tests
+@pytest.mark.django_db
+def test_member_can_list_project_sections(
+    api_client, member_user, organization, project, section
+):
+    api_client.force_authenticate(user=member_user)
+
+    url = reverse(
+        "section-list-create",
+        kwargs={
+            "organization_id": organization.id,
+            "project_id": project.id,
+        },
+    )
+
+    response = api_client.get(url)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data) == 1
+    assert response.data[0]["id"] == str(section.id)
+
+
+@pytest.mark.django_db
+def test_non_member_cannot_list_project_sections(
+    api_client, non_member_user, organization, project
+):
+    api_client.force_authenticate(user=non_member_user)
+
+    url = reverse(
+        "section-list-create",
+        kwargs={
+            "organization_id": organization.id,
+            "project_id": project.id,
+        },
+    )
+
+    response = api_client.get(url)
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
+def test_admin_can_create_section(
+    api_client, organization_admin_user, organization, project
+):
+    api_client.force_authenticate(user=organization_admin_user)
+
+    url = reverse(
+        "section-list-create",
+        kwargs={
+            "organization_id": organization.id,
+            "project_id": project.id,
+        },
+    )
+
+    response = api_client.post(
+        url,
+        {
+            "name": "In Progress",
+            "description": "Tasks currently being worked on.",
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.data["name"] == "In Progress"
+    assert response.data["position"] == 0
+
+    assert Section.objects.filter(
+        project=project,
+        name="In Progress",
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_member_cannot_create_section(api_client, member_user, organization, project):
+    api_client.force_authenticate(user=member_user)
+
+    url = reverse(
+        "section-list-create",
+        kwargs={
+            "organization_id": organization.id,
+            "project_id": project.id,
+        },
+    )
+
+    response = api_client.post(
+        url,
+        {"name": "In Progress"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert not Section.objects.filter(
+        project=project,
+        name="In Progress",
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_create_section_rejects_blank_name(
+    api_client, organization_admin_user, organization, project
+):
+    api_client.force_authenticate(user=organization_admin_user)
+
+    url = reverse(
+        "section-list-create",
+        kwargs={
+            "organization_id": organization.id,
+            "project_id": project.id,
+        },
+    )
+
+    response = api_client.post(
+        url,
+        {"name": "   "},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "name" in response.data
+
+
+@pytest.mark.django_db
+def test_member_can_retrieve_section(
+    api_client, member_user, organization, project, section
+):
+    api_client.force_authenticate(user=member_user)
+
+    url = reverse(
+        "section-detail",
+        kwargs={
+            "organization_id": organization.id,
+            "project_id": project.id,
+            "section_id": section.id,
+        },
+    )
+
+    response = api_client.get(url)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["id"] == str(section.id)
+    assert response.data["name"] == section.name
+
+
+@pytest.mark.django_db
+def test_admin_can_update_section(
+    api_client, organization_admin_user, organization, project, section
+):
+    api_client.force_authenticate(user=organization_admin_user)
+
+    url = reverse(
+        "section-detail",
+        kwargs={
+            "organization_id": organization.id,
+            "project_id": project.id,
+            "section_id": section.id,
+        },
+    )
+
+    response = api_client.patch(
+        url,
+        {
+            "name": "In Progress",
+            "description": "Work currently underway.",
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+    section.refresh_from_db()
+
+    assert section.name == "In Progress"
+    assert section.description == "Work currently underway."
+
+
+@pytest.mark.django_db
+def test_member_cannot_update_section(
+    api_client, member_user, organization, project, section
+):
+    api_client.force_authenticate(user=member_user)
+
+    url = reverse(
+        "section-detail",
+        kwargs={
+            "organization_id": organization.id,
+            "project_id": project.id,
+            "section_id": section.id,
+        },
+    )
+
+    response = api_client.patch(
+        url,
+        {"name": "In Progress"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    section.refresh_from_db()
+    assert section.name == "backlog"
+
+
+@pytest.mark.django_db
+def test_admin_can_delete_section(
+    api_client, organization_admin_user, organization, project, section
+):
+    api_client.force_authenticate(user=organization_admin_user)
+
+    url = reverse(
+        "section-detail",
+        kwargs={
+            "organization_id": organization.id,
+            "project_id": project.id,
+            "section_id": section.id,
+        },
+    )
+
+    response = api_client.delete(url)
+
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    assert not Section.objects.filter(id=section.id).exists()
+
+
+@pytest.mark.django_db
+def test_cannot_retrieve_section_from_another_project(
+    api_client, member_user, organization, project, organization_admin_user
+):
+    other_project = Project.objects.create(
+        organization=organization,
+        created_by=organization_admin_user,
+        name="Another Project",
+    )
+
+    other_section = Section.objects.create(
+        project=other_project,
+        name="Other Backlog",
+    )
+
+    api_client.force_authenticate(user=member_user)
+
+    url = reverse(
+        "section-detail",
+        kwargs={
+            "organization_id": organization.id,
+            "project_id": project.id,
+            "section_id": other_section.id,
+        },
+    )
+
+    response = api_client.get(url)
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_admin_can_reorder_sections(
+    api_client, organization_admin_user, organization, project, section
+):
+    second = Section.objects.create(
+        project=project,
+        name="In Progress",
+        position=1,
+    )
+
+    third = Section.objects.create(
+        project=project,
+        name="Done",
+        position=2,
+    )
+
+    api_client.force_authenticate(user=organization_admin_user)
+
+    url = reverse(
+        "section-reorder",
+        kwargs={
+            "organization_id": organization.id,
+            "project_id": project.id,
+            "section_id": third.id,
+        },
+    )
+
+    response = api_client.patch(
+        url,
+        {"position": 0},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+    sections = list(Section.objects.filter(project=project).order_by("position"))
+
+    assert [item.name for item in sections] == [
+        "Done",
+        "backlog",
+        "In Progress",
+    ]
+
+    third.refresh_from_db()
+
+    assert third.position == 0
+
+    section.refresh_from_db()
+    assert section.position == 1
+
+    second.refresh_from_db()
+    assert second.position == 2
+
+
+@pytest.mark.django_db
+def test_member_cannot_reorder_sections(
+    api_client, member_user, organization, project, section
+):
+    api_client.force_authenticate(user=member_user)
+
+    url = reverse(
+        "section-reorder",
+        kwargs={
+            "organization_id": organization.id,
+            "project_id": project.id,
+            "section_id": section.id,
+        },
+    )
+
+    response = api_client.patch(
+        url,
+        {"position": 1},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
+def test_reorder_rejects_invalid_position(
+    api_client, organization_admin_user, organization, project, section
+):
+    api_client.force_authenticate(user=organization_admin_user)
+
+    url = reverse(
+        "section-reorder",
+        kwargs={
+            "organization_id": organization.id,
+            "project_id": project.id,
+            "section_id": section.id,
+        },
+    )
+
+    response = api_client.patch(
+        url,
+        {"position": 5},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST

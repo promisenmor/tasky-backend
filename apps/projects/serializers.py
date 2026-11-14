@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Project
+from .models import Project, Section
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -91,3 +91,36 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
 
     def validate_description(self, value):
         return value.strip()
+
+
+class SectionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Section
+        fields = [
+            "id",
+            "project",
+            "name",
+            "description",
+            "position",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "project", "position", "created_at", "updated_at"]
+
+    def validate_name(self, value):
+        value = value.strip()
+
+        if not value:
+            raise serializers.ValidationError("Section name cannot be empty.")
+
+        return value
+
+    def validate_description(self, value):
+        if value is not None:
+            return value.strip()
+
+        return value
+
+
+class SectionReorderSerializer(serializers.Serializer):
+    position = serializers.IntegerField(min_value=0)

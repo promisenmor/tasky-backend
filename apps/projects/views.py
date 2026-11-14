@@ -10,16 +10,23 @@ from apps.organizations.permissions import (
     IsOrganizationAdmin,
     IsOrganizationMember,
 )
-from apps.projects.models import Project
+from apps.projects.mixin import SectionProjectMixin
+from apps.projects.models import Project, Section
 from apps.projects.serializers import (
     ProjectCreateSerializer,
     ProjectSerializer,
+    SectionReorderSerializer,
+    SectionSerializer,
 )
 from apps.projects.services import (
     archive_project,
     create_project,
+    create_section,
+    delete_section,
+    reorder_section,
     restore_project,
     update_project,
+    update_section,
 )
 
 
@@ -197,3 +204,124 @@ class ProjectRestoreView(ProjectArchiveView):
             raise serializers.ValidationError({"detail": str(exc)}) from exc
 
         return Response(ProjectSerializer(project).data, status=status.HTTP_200_OK)
+
+
+# Section views
+class SectionListCreateView(SectionProjectMixin, generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = SectionSerializer
+    pagination_class = None
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [
+                IsAuthenticated(),
+                IsOrganizationAdmin(),
+            ]
+
+        return [
+            IsAuthenticated(),
+            IsOrganizationMember(),
+        ]
+
+    def get_queryset(self):
+        project = self.get_project(self.request)
+
+        return Section.objects.filter(
+            project=project,
+        ).order_by("position", "created_at")
+
+    def create(self, request, *args, **kwargs):
+        project = self.get_project(request)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            section = create_section(
+                project=project,
+                actor=request.user,
+                **serializer.validated_data,
+            )
+
+        except ValidationError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+
+        return Response(SectionSerializer(section).data, status=status.HTTP_201_CREATED)
+
+
+class SectionDetailView(SectionProjectMixin, generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = SectionSerializer
+    lookup_url_kwarg = "section_id"
+
+    def get_permissions(self):
+        if self.request.method in ["PATCH", "PUT", "DELETE"]:
+            return [
+                IsAuthenticated(),
+                IsOrganizationAdmin(),
+            ]
+
+        return [
+            IsAuthenticated(),
+            IsOrganizationMember(),
+        ]
+
+    def get_object(self):
+        return self.get_section(self.request)
+
+    def update(self, request, *args, **kwargs):
+        section = self.get_object()
+
+        serializer = self.get_serializer(
+            section,
+            data=request.data,
+            partial=kwargs.pop("partial", False),
+        )
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            section = update_section(
+                section=section,
+                actor=request.user,
+                **serializer.validated_data,
+            )
+        except ValidationError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+
+        return Response(SectionSerializer(section).data)
+
+    def destroy(self, request, *args, **kwargs):
+        section = self.get_object()
+
+        try:
+            section = delete_section(
+                section=section,
+                actor=request.user,
+            )
+        except ValidationError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class SectionReorderView(SectionProjectMixin, generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, IsOrganizationAdmin]
+    serializer_class = SectionReorderSerializer
+
+    def patch(self, request, *args, **kwargs):
+        section = self.get_section(request)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            section = reorder_section(
+                section=section,
+                actor=request.user,
+                new_position=serializer.validated_data["position"],
+            )
+        except ValidationError as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+
+        return Response(SectionSerializer(section).data, status=status.HTTP_200_OK)
