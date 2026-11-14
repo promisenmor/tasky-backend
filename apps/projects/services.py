@@ -163,7 +163,7 @@ def create_section(
         raise ValidationError("You must be an admin or owner of this organization.")
 
     name = name.strip()
-    description = (description or "").strip
+    description = (description or "").strip()
 
     if not name:
         raise ValidationError("A Section name cannot be empty.")
@@ -172,8 +172,8 @@ def create_section(
         raise ValidationError("A section with this name already exists in this project")
     last_position = (
         Section.objects.filter(project=project)
-        .order_by("-postion")
-        .values_list("postion", first=True)
+        .order_by("-position")
+        .values_list("position", flat=True)
         .first()
     )
 

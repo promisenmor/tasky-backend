@@ -2,10 +2,11 @@ import pytest
 from django.core.exceptions import ValidationError
 
 from apps.organizations.models import Membership
-from apps.projects.models import Project
+from apps.projects.models import Project, Section
 from apps.projects.services import (
     archive_project,
     create_project,
+    create_section,
     restore_project,
     update_project,
 )
@@ -13,9 +14,9 @@ from apps.projects.services import (
 
 @pytest.mark.django_db
 def test_owner_can_create_project(organization, user):
-    Membership.objects.create(
-        user=user, organization=organization, role=Membership.Role.OWNER
-    )
+    # Membership.objects.create(
+    #     user=user, organization=organization, role=Membership.Role.OWNER
+    # )
 
     project = create_project(
         organization=organization,
@@ -32,11 +33,11 @@ def test_owner_can_create_project(organization, user):
 
 @pytest.mark.django_db
 def test_admin_can_create_project(organization, user):
-    Membership.objects.create(
-        user=user,
-        organization=organization,
-        role=Membership.Role.ADMIN,
-    )
+    # Membership.objects.create(
+    #     user=user,
+    #     organization=organization,
+    #     role=Membership.Role.ADMIN,
+    # )
 
     project = create_project(
         organization=organization,
@@ -53,11 +54,12 @@ def test_admin_can_create_project(organization, user):
 
 @pytest.mark.django_db
 def test_member_cannot_create_project(organization, user):
-    Membership.objects.create(
+    membership = Membership.objects.get(
         user=user,
         organization=organization,
-        role=Membership.Role.MEMBER,
     )
+    membership.role = Membership.Role.MEMBER
+    membership.save(update_fields=["role"])
 
     with pytest.raises(
         ValidationError, match="You must be an admin or owner of this organization"
@@ -70,6 +72,10 @@ def test_member_cannot_create_project(organization, user):
 @pytest.mark.django_db
 def test_non_member_cannot_create_project(organization, user):
     # The user has no membership in this organization
+    Membership.objects.filter(
+        user=user,
+        organization=organization,
+    ).delete()
 
     with pytest.raises(
         ValidationError,
@@ -86,11 +92,11 @@ def test_non_member_cannot_create_project(organization, user):
 
 @pytest.mark.django_db
 def test_create_project_strips_name_and_description(organization, user):
-    Membership.objects.create(
-        user=user,
-        organization=organization,
-        role=Membership.Role.OWNER,
-    )
+    # Membership.objects.create(
+    #     user=user,
+    #     organization=organization,
+    #     role=Membership.Role.OWNER,
+    # )
 
     project = create_project(
         organization=organization,
@@ -105,11 +111,11 @@ def test_create_project_strips_name_and_description(organization, user):
 
 @pytest.mark.django_db
 def test_create_project_rejects_empty_name(organization, user):
-    Membership.objects.create(
-        user=user,
-        organization=organization,
-        role=Membership.Role.OWNER,
-    )
+    # Membership.objects.create(
+    #     user=user,
+    #     organization=organization,
+    #     role=Membership.Role.OWNER,
+    # )
 
     with pytest.raises(ValidationError, match="Project name cannot be empty"):
         create_project(
@@ -126,11 +132,11 @@ def test_create_project_description_ddefaults_to_empty_string(
     organization,
     user,
 ):
-    Membership.objects.create(
-        user=user,
-        organization=organization,
-        role=Membership.Role.OWNER,
-    )
+    # Membership.objects.create(
+    #     user=user,
+    #     organization=organization,
+    #     role=Membership.Role.OWNER,
+    # )
 
     project = create_project(
         organization=organization,
@@ -146,11 +152,11 @@ def test_duplicate_project_name_in_the_same_organization_is_rejected(
     organization,
     user,
 ):
-    Membership.objects.create(
-        user=user,
-        organization=organization,
-        role=Membership.Role.OWNER,
-    )
+    # Membership.objects.create(
+    #     user=user,
+    #     organization=organization,
+    #     role=Membership.Role.OWNER,
+    # )
 
     create_project(
         organization=organization,
@@ -180,11 +186,6 @@ def test_same_project_name_is_allowed_in_different_organization(
     other_organization,
     user,
 ):
-    Membership.objects.create(
-        user=user,
-        organization=organization,
-        role=Membership.Role.OWNER,
-    )
     Membership.objects.create(
         user=user,
         organization=other_organization,
@@ -548,3 +549,103 @@ def test_member_and_non_member_cannot_restore_project(organization, user, role):
 
     project.refresh_from_db()
     assert project.status == Project.Status.ARCHIVED
+
+
+# Section service tests
+
+
+@pytest.mark.django_db
+def test_admin_can_create_section(project, organization_admin_user):
+    section = create_section(
+        project=project,
+        actor=organization_admin_user,
+        name="Backlog",
+    )
+
+    assert section.project == project
+    assert section.name == "Backlog"
+    assert section.position == 0
+
+
+@pytest.mark.django_db
+def test_owner_can_create_section(project, user):
+    section = create_section(
+        project=project,
+        actor=user,
+        name="In Progress",
+    )
+
+    assert section.name == "In Progress"
+
+
+@pytest.mark.django_db
+def test_member_cannot_create_section(project, member_user):
+    with pytest.raises(ValidationError):
+        create_section(
+            project=project,
+            actor=member_user,
+            name="Backlog",
+        )
+
+
+@pytest.mark.django_db
+def test_non_member_cannot_create_section(project, non_member_user):
+    with pytest.raises(ValidationError):
+        create_section(
+            project=project,
+            actor=non_member_user,
+            name="Backlog",
+        )
+
+
+@pytest.mark.django_db
+def test_create_section_strips_name_and_description(project, organization_admin_user):
+    section = create_section(
+        project=project,
+        actor=organization_admin_user,
+        name="  Backlog  ",
+        description="  Tasks waiting to start.  ",
+    )
+
+    assert section.name == "Backlog"
+    assert section.description == "Tasks waiting to start."
+
+
+@pytest.mark.django_db
+def test_create_section_rejects_empty_name(project, organization_admin_user):
+    with pytest.raises(ValidationError):
+        create_section(
+            project=project,
+            actor=organization_admin_user,
+            name="   ",
+        )
+
+
+@pytest.mark.django_db
+def test_duplicate_section_name_rejected(project, organization_admin_user):
+    Section.objects.create(project=project, name="Backlog")
+
+    with pytest.raises(ValidationError):
+        create_section(
+            project=project,
+            actor=organization_admin_user,
+            name="Backlog",
+        )
+
+
+@pytest.mark.django_db
+def test_new_sections_receive_next_position(project, organization_admin_user):
+    first = create_section(
+        project=project,
+        actor=organization_admin_user,
+        name="Backlog",
+    )
+
+    second = create_section(
+        project=project,
+        actor=organization_admin_user,
+        name="In Progress",
+    )
+
+    assert first.position == 0
+    assert second.position == 1
