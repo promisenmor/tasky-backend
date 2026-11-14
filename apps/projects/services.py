@@ -180,12 +180,13 @@ def create_section(
     next_position = 0 if last_position is None else last_position + 1
 
     try:
-        return Section.objects.create(
-            project=project,
-            name=name,
-            description=description,
-            position=next_position,
-        )
+        with transaction.atomic():
+            return Section.objects.create(
+                project=project,
+                name=name,
+                description=description,
+                position=next_position,
+            )
     except IntegrityError as exc:
         raise ValidationError(
             "A section with this name already exists in this project."
@@ -197,7 +198,7 @@ def update_section(
     *,
     section: Section,
     actor,
-    name: str,
+    name: str | None = None,
     description: str | None = None,
 ) -> Section:
     """Update a section's name and description."""
@@ -260,7 +261,7 @@ def delete_section(*, section: Section, actor) -> None:
 
 
 @transaction.atomic
-def reoder_section(
+def reorder_section(
     *,
     section: Section,
     actor,
@@ -284,7 +285,7 @@ def reoder_section(
     section_count = sections.count()
 
     if new_position >= section_count:
-        raise ValidationError("Position is outsie the valid section range.")
+        raise ValidationError("Position is outside the valid section range.")
 
     if section.position == new_position:
         return section
@@ -304,3 +305,5 @@ def reoder_section(
 
     section.position = new_position
     section.save(update_fields=["position", "updated_at"])
+
+    return section
