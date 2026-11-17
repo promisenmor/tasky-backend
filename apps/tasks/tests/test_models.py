@@ -1,10 +1,21 @@
+from datetime import timedelta
+
 import pytest
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from apps.organizations.models import Membership
-from apps.tasks.models import Comment, Label, Task, TaskAssignee, TaskLabel
+from apps.tasks.models import (
+    Attachment,
+    Comment,
+    Label,
+    Task,
+    TaskAssignee,
+    TaskLabel,
+    TimeEntry,
+)
 
 
 @pytest.mark.django_db
@@ -496,3 +507,230 @@ class TestCommentModel:
         task.delete()
 
         assert not Comment.objects.filter(id=comment.id).exists()
+
+
+@pytest.mark.django_db
+def test_attachment_can_be_created(project, user):
+    uploaded_file = SimpleUploadedFile(
+        "screenshot.png", b"fake image content", content_type="image/png"
+    )
+
+    task = Task.objects.create(
+        project=project,
+        title="Build API",
+        created_by=user,
+    )
+
+    attachment = Attachment.objects.create(
+        task=task,
+        uploaded_by=user,
+        file=uploaded_file,
+        file_size=19,
+        mime_type="image/png",
+    )
+
+    assert attachment.task == task
+    assert attachment.uploaded_by == user
+    assert attachment.file_size == 19
+    assert attachment.mime_type == "image/png"
+
+
+@pytest.mark.django_db
+def test_attachment_has_uuid(project, user):
+    uploaded_file = SimpleUploadedFile(
+        "document.pdf", b"fake pdf content", content_type="application/pdf"
+    )
+
+    task = Task.objects.create(
+        project=project,
+        title="Build API",
+        created_by=user,
+    )
+
+    attachment = Attachment.objects.create(
+        task=task,
+        uploaded_by=user,
+        file=uploaded_file,
+        file_size=16,
+        mime_type="application/pdf",
+    )
+
+    assert attachment.id is not None
+
+
+@pytest.mark.django_db
+def test_attachment_has_creation_timestamp(project, user):
+    before = timezone.now()
+
+    uploaded_file = SimpleUploadedFile(
+        "document.pdf", b"content", content_type="application/pdf"
+    )
+
+    task = Task.objects.create(
+        project=project,
+        title="Build API",
+        created_by=user,
+    )
+
+    attachment = Attachment.objects.create(
+        task=task,
+        uploaded_by=user,
+        file=uploaded_file,
+        file_size=7,
+        mime_type="application/pdf",
+    )
+
+    after = timezone.now()
+
+    assert before <= attachment.uploaded_at <= after
+
+
+@pytest.mark.django_db
+def test_task_can_have_multiple_attachments(project, user):
+    for filename in ["first.pdf", "second.png"]:
+        uploaded_file = SimpleUploadedFile(
+            filename, b"file content", content_type="application/octet-stream"
+        )
+
+        task = Task.objects.create(
+            project=project,
+            title="Build API",
+            created_by=user,
+        )
+
+        Attachment.objects.create(
+            task=task,
+            uploaded_by=user,
+            file=uploaded_file,
+            file_size=12,
+            mime_type="application/octet-stream",
+        )
+
+    assert task.attachments.count() == 1
+
+
+@pytest.mark.django_db
+def test_attachment_string_representation(project, user):
+    uploaded_file = SimpleUploadedFile(
+        "report.pdf", b"report content", content_type="application/pdf"
+    )
+
+    task = Task.objects.create(
+        project=project,
+        title="Build API",
+        created_by=user,
+    )
+
+    attachment = Attachment.objects.create(
+        task=task,
+        uploaded_by=user,
+        file=uploaded_file,
+        file_size=14,
+        mime_type="application/pdf",
+    )
+
+    assert str(attachment) == f"{attachment.file.name} - {task.title}"
+
+
+@pytest.mark.django_db
+def test_deleting_task_deletes_attachments(project, user):
+    uploaded_file = SimpleUploadedFile(
+        "report.pdf", b"report content", content_type="application/pdf"
+    )
+
+    task = Task.objects.create(
+        project=project,
+        title="Build API",
+        created_by=user,
+    )
+
+    attachment = Attachment.objects.create(
+        task=task,
+        uploaded_by=user,
+        file=uploaded_file,
+        file_size=14,
+        mime_type="application/pdf",
+    )
+
+    task.delete()
+
+    assert not Attachment.objects.filter(id=attachment.id).exists()
+
+
+@pytest.mark.django_db
+def test_time_entry_can_be_created(task, user):
+    start = timezone.now()
+
+    entry = TimeEntry.objects.create(task=task, user=user, start_time=start)
+
+    assert entry.task == task
+    assert entry.user == user
+    assert entry.start_time == start
+
+
+@pytest.mark.django_db
+def test_time_entry_has_uuid(task, user):
+    entry = TimeEntry.objects.create(task=task, user=user, start_time=timezone.now())
+
+    assert entry.id is not None
+
+
+@pytest.mark.django_db
+def test_running_timer_has_no_end_time_or_duration(task, user):
+    entry = TimeEntry.objects.create(task=task, user=user, start_time=timezone.now())
+
+    assert entry.end_time is None
+    assert entry.duration is None
+
+
+@pytest.mark.django_db
+def test_completed_time_entry_can_store_end_time_and_duration(task, user):
+    start = timezone.now()
+    end = start + timedelta(hours=2)
+
+    entry = TimeEntry.objects.create(
+        task=task,
+        user=user,
+        start_time=start,
+        end_time=end,
+        duration=timedelta(hours=2),
+    )
+
+    assert entry.end_time == end
+    assert entry.duration == timedelta(hours=2)
+
+
+@pytest.mark.django_db
+def test_time_entry_has_creation_timestamp(task, user):
+    before = timezone.now()
+
+    entry = TimeEntry.objects.create(task=task, user=user, start_time=timezone.now())
+
+    after = timezone.now()
+
+    assert before <= entry.created_at <= after
+
+
+@pytest.mark.django_db
+def test_task_can_have_multiple_time_entries(task, user):
+    for _ in range(2):
+        TimeEntry.objects.create(task=task, user=user, start_time=timezone.now())
+
+    assert task.time_entries.count() == 2
+
+
+@pytest.mark.django_db
+def test_time_entry_string_representation(task, user):
+    entry = TimeEntry.objects.create(task=task, user=user, start_time=timezone.now())
+
+    assert str(entry) == f"{user.full_name} - {task.title}"
+
+
+@pytest.mark.django_db
+def test_deleting_task_deletes_time_entries(task, user):
+    entry = TimeEntry.objects.create(task=task, user=user, start_time=timezone.now())
+
+    entry_id = entry.id
+    task.delete()
+
+    assert not TimeEntry.objects.filter(id=entry_id).exists()
