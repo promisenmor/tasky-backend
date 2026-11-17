@@ -152,3 +152,43 @@ class Comment(models.Model):
 
     def __str__(self):
         return f"{self.author.full_name} - {self.task.title}"
+
+
+class Attachment(models.Model):
+    id = models.UUIDField(default=uuid4, primary_key=True, editable=False)
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="attachments")
+    file = models.FileField(upload_to="task_attachments/%Y/%m/")
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="uploaded_attachments",
+    )
+    file_size = models.PositiveBigIntegerField()
+    mime_type = models.CharField(max_length=100)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.file.name} - {self.task.title}"
+
+
+class TimeEntry(models.Model):
+    id = models.UUIDField(default=uuid4, primary_key=True, editable=False)
+    task = models.ForeignKey(
+        Task, on_delete=models.CASCADE, related_name="time_entries"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="time_entries"
+    )
+
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField(blank=True, null=True)
+
+    duration = models.DurationField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-start_time"]
+
+    def __str__(self):
+        return f"{self.user.full_name} - {self.task.title}"
