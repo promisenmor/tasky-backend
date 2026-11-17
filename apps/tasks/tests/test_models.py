@@ -1,6 +1,9 @@
 import pytest
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 
-from apps.tasks.models import Task
+from apps.organizations.models import Membership
+from apps.tasks.models import Label, Task, TaskAssignee, TaskLabel
 
 
 @pytest.mark.django_db
@@ -34,7 +37,7 @@ class TestTaskModel:
             created_by=user,
         )
 
-        assert task.piority == Task.Piority.MEDIUM
+        assert task.priority == Task.Priority.MEDIUM
 
     def test_default_status_is_to_do(self, project, user):
         task = Task.objects.create(
@@ -89,3 +92,284 @@ class TestTaskModel:
         )
 
         assert task in project.tasks.all()
+
+
+@pytest.mark.django_db
+class TestTaskAssigneeModel:
+    def test_create_task_assignee(self, project, user):
+        task = Task.objects.create(
+            project=project,
+            title="Build API",
+            created_by=user,
+        )
+
+        membership = Membership.objects.get(
+            user=user,
+            organization=project.organization,
+        )
+
+        assignment = TaskAssignee.objects.create(
+            task=task,
+            organization_membership=membership,
+        )
+
+        assert assignment.task == task
+        assert assignment.organization_membership == membership
+
+    def test_task_can_have_multiple_assignees(self, project, user, member_user):
+        task = Task.objects.create(
+            project=project,
+            title="Build API",
+            created_by=user,
+        )
+
+        memberships = Membership.objects.filter(
+            organization=project.organization,
+            user__in=[user, member_user],
+        )
+
+        for membership in memberships:
+            TaskAssignee.objects.create(
+                task=task,
+                organization_membership=membership,
+            )
+
+        assert task.assignees.count() == 2
+
+    def test_same_member_cannot_be_assigned_twice(self, project, user):
+        task = Task.objects.create(
+            project=project,
+            title="Build API",
+            created_by=user,
+        )
+
+        membership = Membership.objects.get(
+            user=user,
+            organization=project.organization,
+        )
+
+        TaskAssignee.objects.create(
+            task=task,
+            organization_membership=membership,
+        )
+
+        with pytest.raises(IntegrityError):
+            with transaction.atomic():
+                TaskAssignee.objects.create(
+                    task=task,
+                    organization_membership=membership,
+                )
+
+    def test_assignee_must_belong_to_project_organization(
+        self, project, user, other_organization
+    ):
+        task = Task.objects.create(
+            project=project,
+            title="Build API",
+            created_by=user,
+        )
+
+        other_membership = Membership.objects.create(
+            user=user,
+            organization=other_organization,
+            role=Membership.Role.MEMBER,
+        )
+
+        assignment = TaskAssignee(
+            task=task,
+            organization_membership=other_membership,
+        )
+
+        with pytest.raises(ValidationError):
+            assignment.full_clean()
+
+    def test_assignment_string_representation(self, project, user):
+        task = Task.objects.create(
+            project=project,
+            title="Build API",
+            created_by=user,
+        )
+
+        membership = Membership.objects.get(
+            user=user,
+            organization=project.organization,
+        )
+
+        assignment = TaskAssignee.objects.create(
+            task=task,
+            organization_membership=membership,
+        )
+
+        assert str(assignment) == f"{user.full_name} - Build API"
+
+
+@pytest.mark.django_db
+class TestLabelModel:
+    def test_create_label(self, organization):
+        label = Label.objects.create(
+            organization=organization,
+            name="Backend",
+        )
+
+        assert label.name == "Backend"
+        assert label.organization == organization
+
+    def test_label_string_representation(self, organization):
+        label = Label.objects.create(
+            organization=organization,
+            name="Frontend",
+        )
+
+        assert str(label) == "Frontend"
+
+    def test_label_name_must_be_unique_per_organization(self, organization):
+        Label.objects.create(
+            organization=organization,
+            name="Backend",
+        )
+
+        with pytest.raises(IntegrityError):
+            with transaction.atomic():
+                Label.objects.create(
+                    organization=organization,
+                    name="Backend",
+                )
+
+    def test_same_label_name_allowed_in_different_organizations(
+        self, organization, other_organization
+    ):
+        first_label = Label.objects.create(
+            organization=organization,
+            name="Backend",
+        )
+
+        second_label = Label.objects.create(
+            organization=other_organization,
+            name="Backend",
+        )
+
+        assert first_label.name == second_label.name
+        assert first_label.organization != second_label.organization
+
+
+@pytest.mark.django_db
+class TestTaskLabelModel:
+    def test_create_task_label(self, project, user):
+        task = Task.objects.create(project=project, title="Build API", created_by=user)
+
+        label = Label.objects.create(
+            organization=project.organization,
+            name="Backend",
+        )
+
+        task_label = TaskLabel.objects.create(
+            task=task,
+            label=label,
+        )
+
+        assert task_label.task == task
+        assert task_label.label == label
+
+    def test_task_can_have_multiple_labels(self, project, user):
+        task = Task.objects.create(project=project, title="Build API", created_by=user)
+
+        labels = [
+            Label.objects.create(
+                organization=project.organization,
+                name="Backend",
+            ),
+            Label.objects.create(
+                organization=project.organization,
+                name="Frontend",
+            ),
+        ]
+
+        for label in labels:
+            TaskLabel.objects.create(
+                task=task,
+                label=label,
+            )
+
+        assert task.label.count() == 2
+
+    def test_label_can_be_reused_by_multiple_tasks(self, project, user):
+        label = Label.objects.create(
+            organization=project.organization,
+            name="Backend",
+        )
+
+        first_task = Task.objects.create(
+            project=project,
+            title="Build API",
+            created_by=user,
+        )
+
+        second_task = Task.objects.create(
+            project=project,
+            title="Build Authentication",
+            created_by=user,
+        )
+
+        TaskLabel.objects.create(task=first_task, label=label)
+        TaskLabel.objects.create(task=second_task, label=label)
+
+        assert label.tasks.count() == 2
+
+    def test_duplicated_task_label_is_rejected(self, project, user):
+        task = Task.objects.create(
+            project=project,
+            title="Build API",
+            created_by=user,
+        )
+
+        label = Label.objects.create(
+            organization=project.organization,
+            name="Backend",
+        )
+
+        TaskLabel.objects.create(task=task, label=label)
+
+        with pytest.raises(IntegrityError):
+            with transaction.atomic():
+                TaskLabel.objects.create(
+                    task=task,
+                    label=label,
+                )
+
+    def test_label_must_belong_to_task_organization(
+        self, project, user, other_organization
+    ):
+        task = Task.objects.create(
+            project=project,
+            title="Build API",
+            created_by=user,
+        )
+
+        label = Label.objects.create(
+            organization=other_organization,
+            name="Backend",
+        )
+
+        task_label = TaskLabel(
+            task=task,
+            label=label,
+        )
+
+        with pytest.raises(ValidationError):
+            task_label.full_clean()
+
+    def test_task_label_string_representation(self, project, user):
+        task = Task.objects.create(
+            project=project,
+            title="Build API",
+            created_by=user,
+        )
+
+        label = Label.objects.create(
+            organization=project.organization,
+            name="Backend",
+        )
+
+        task_label = TaskLabel.objects.create(task=task, label=label)
+
+        assert str(task_label) == "Build API - Backend"

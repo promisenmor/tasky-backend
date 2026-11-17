@@ -1,11 +1,14 @@
 from uuid import uuid4
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
+
+from apps.organizations.models import Membership, Organization
 
 
 class Task(models.Model):
-    class Piority(models.TextChoices):
+    class Priority(models.TextChoices):
         LOW = "LOW", "Low"
         MEDIUM = "MEDIUM", "Medium"
         HIGH = "HIGH", "High"
@@ -19,11 +22,14 @@ class Task(models.Model):
     id = models.UUIDField(default=uuid4, primary_key=True, editable=False)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
+    label = models.ManyToManyField(
+        "Label", through="TaskLabel", related_name="tasks", blank=True
+    )
     project = models.ForeignKey(
         "projects.Project", on_delete=models.CASCADE, related_name="tasks"
     )
-    piority = models.CharField(
-        max_length=10, choices=Piority.choices, default=Piority.MEDIUM
+    priority = models.CharField(
+        max_length=10, choices=Priority.choices, default=Priority.MEDIUM
     )
     status = models.CharField(
         max_length=15, choices=Status.choices, default=Status.TODO
@@ -43,3 +49,92 @@ class Task(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class TaskAssignee(models.Model):
+    id = models.UUIDField(default=uuid4, primary_key=True, editable=False)
+    task = models.ForeignKey(
+        Task,
+        on_delete=models.CASCADE,
+        related_name="assignees",
+    )
+    organization_membership = models.ForeignKey(
+        Membership,
+        on_delete=models.CASCADE,
+        related_name="task_assignments",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["task", "organization_membership"],
+                name="unique_task_assignee",
+            ),
+        ]
+
+    def clean(self):
+        if (
+            self.task.id
+            and self.organization_membership_id
+            and self.task.project.organization_id
+            != self.organization_membership.organization_id
+        ):
+            raise ValidationError(
+                {
+                    "organization_membership": "The assignee must belong to the task's project organization."
+                }
+            )
+
+    def __str__(self):
+        return f"{self.organization_membership.user.full_name} - {self.task.title}"
+
+
+class Label(models.Model):
+    id = models.UUIDField(default=uuid4, primary_key=True, editable=False)
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="task_labels"
+    )
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "name"],
+                name="unique_label_name_per_organization",
+            ),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
+# TaskLabel - an intermediary model connecting tasks and labels.
+class TaskLabel(models.Model):
+    id = models.UUIDField(default=uuid4, primary_key=True, editable=False)
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="task_labels")
+    label = models.ForeignKey(
+        Label, on_delete=models.CASCADE, related_name="task_labels"
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["task", "label"],
+                name="unique_label_per_task",
+            ),
+        ]
+
+    # this clean method enforces organization consistency when model validation is explicity called. As with TaskAssignee.
+    # this will be enforced in the service layer later.
+    def clean(self):
+        if (
+            self.task.id
+            and self.label.id
+            and self.task.project.organization_id != self.label.organization_id
+        ):
+            raise ValidationError(
+                {"label": ("The label must belong to the task's project organization")}
+            )
+
+    def __str__(self):
+        return f"{self.task.title} - {self.label.name}"
