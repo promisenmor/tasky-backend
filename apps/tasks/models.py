@@ -138,3 +138,17 @@ class TaskLabel(models.Model):
 
     def __str__(self):
         return f"{self.task.title} - {self.label.name}"
+
+
+class Comment(models.Model):
+    id = models.UUIDField(default=uuid4, primary_key=True, editable=False)
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="task_comments"
+    )
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="comments")
+    body = models.TextField()
+    edited = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.author.full_name} - {self.task.title}"

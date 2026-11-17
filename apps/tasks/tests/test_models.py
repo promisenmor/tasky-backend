@@ -1,9 +1,10 @@
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 
 from apps.organizations.models import Membership
-from apps.tasks.models import Label, Task, TaskAssignee, TaskLabel
+from apps.tasks.models import Comment, Label, Task, TaskAssignee, TaskLabel
 
 
 @pytest.mark.django_db
@@ -373,3 +374,125 @@ class TestTaskLabelModel:
         task_label = TaskLabel.objects.create(task=task, label=label)
 
         assert str(task_label) == "Build API - Backend"
+
+
+@pytest.mark.django_db
+class TestCommentModel:
+    def test_create_comment(self, project, user):
+        task = Task.objects.create(
+            project=project,
+            title="Build API",
+            created_by=user,
+        )
+
+        comment = Comment.objects.create(
+            task=task,
+            author=user,
+            body="The API implementation is underway.",
+        )
+
+        assert comment.task == task
+        assert comment.author == user
+        assert comment.body == "The API implementation is underway."
+
+    def test_comment_has_uuid(self, project, user):
+        task = Task.objects.create(
+            project=project,
+            title="Build API",
+            created_by=user,
+        )
+
+        comment = Comment.objects.create(
+            task=task,
+            author=user,
+            body="Working on this.",
+        )
+
+        assert comment.id is not None
+
+    def test_comment_is_not_edited_by_default(self, project, user):
+        task = Task.objects.create(
+            project=project,
+            title="Build API",
+            created_by=user,
+        )
+
+        comment = Comment.objects.create(
+            task=task,
+            author=user,
+            body="Initial comment.",
+        )
+
+        assert comment.edited is False
+
+    def test_comment_records_creation_time(self, project, user):
+        task = Task.objects.create(
+            project=project,
+            title="Build API",
+            created_by=user,
+        )
+
+        before_creation = timezone.now()
+
+        comment = Comment.objects.create(
+            task=task,
+            author=user,
+            body="Initial comment.",
+        )
+
+        after_creation = timezone.now()
+
+        assert before_creation <= comment.created_at <= after_creation
+
+    def test_task_can_have_multiple_comments(self, project, user):
+        task = Task.objects.create(
+            project=project,
+            title="Build API",
+            created_by=user,
+        )
+
+        Comment.objects.create(
+            task=task,
+            author=user,
+            body="First comment.",
+        )
+
+        Comment.objects.create(
+            task=task,
+            author=user,
+            body="Second comment.",
+        )
+
+        assert task.comments.count() == 2
+
+    def test_comment_string_representation(self, project, user):
+        task = Task.objects.create(
+            project=project,
+            title="Build API",
+            created_by=user,
+        )
+
+        comment = Comment.objects.create(
+            task=task,
+            author=user,
+            body="Implementation completed.",
+        )
+
+        assert str(comment) == f"{user.full_name} - Build API"
+
+    def test_deleting_task_deletes_its_comments(self, project, user):
+        task = Task.objects.create(
+            project=project,
+            title="Build API",
+            created_by=user,
+        )
+
+        comment = Comment.objects.create(
+            task=task,
+            author=user,
+            body="Implementation completed.",
+        )
+
+        task.delete()
+
+        assert not Comment.objects.filter(id=comment.id).exists()
