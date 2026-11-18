@@ -658,7 +658,13 @@ def test_deleting_task_deletes_attachments(project, user):
 
 
 @pytest.mark.django_db
-def test_time_entry_can_be_created(task, user):
+def test_time_entry_can_be_created(project, user):
+    task = Task.objects.create(
+        project=project,
+        title="Build API",
+        created_by=user,
+    )
+
     start = timezone.now()
 
     entry = TimeEntry.objects.create(task=task, user=user, start_time=start)
@@ -669,14 +675,26 @@ def test_time_entry_can_be_created(task, user):
 
 
 @pytest.mark.django_db
-def test_time_entry_has_uuid(task, user):
+def test_time_entry_has_uuid(project, user):
+    task = Task.objects.create(
+        project=project,
+        title="Build API",
+        created_by=user,
+    )
+
     entry = TimeEntry.objects.create(task=task, user=user, start_time=timezone.now())
 
     assert entry.id is not None
 
 
 @pytest.mark.django_db
-def test_running_timer_has_no_end_time_or_duration(task, user):
+def test_running_timer_has_no_end_time_or_duration(project, user):
+    task = Task.objects.create(
+        project=project,
+        title="Build API",
+        created_by=user,
+    )
+
     entry = TimeEntry.objects.create(task=task, user=user, start_time=timezone.now())
 
     assert entry.end_time is None
@@ -684,7 +702,13 @@ def test_running_timer_has_no_end_time_or_duration(task, user):
 
 
 @pytest.mark.django_db
-def test_completed_time_entry_can_store_end_time_and_duration(task, user):
+def test_completed_time_entry_can_store_end_time_and_duration(project, user):
+    task = Task.objects.create(
+        project=project,
+        title="Build API",
+        created_by=user,
+    )
+
     start = timezone.now()
     end = start + timedelta(hours=2)
 
@@ -701,7 +725,13 @@ def test_completed_time_entry_can_store_end_time_and_duration(task, user):
 
 
 @pytest.mark.django_db
-def test_time_entry_has_creation_timestamp(task, user):
+def test_time_entry_has_creation_timestamp(project, user):
+    task = Task.objects.create(
+        project=project,
+        title="Build API",
+        created_by=user,
+    )
+
     before = timezone.now()
 
     entry = TimeEntry.objects.create(task=task, user=user, start_time=timezone.now())
@@ -712,7 +742,13 @@ def test_time_entry_has_creation_timestamp(task, user):
 
 
 @pytest.mark.django_db
-def test_task_can_have_multiple_time_entries(task, user):
+def test_task_can_have_multiple_time_entries(project, user):
+    task = Task.objects.create(
+        project=project,
+        title="Build API",
+        created_by=user,
+    )
+
     for _ in range(2):
         TimeEntry.objects.create(task=task, user=user, start_time=timezone.now())
 
@@ -720,14 +756,26 @@ def test_task_can_have_multiple_time_entries(task, user):
 
 
 @pytest.mark.django_db
-def test_time_entry_string_representation(task, user):
+def test_time_entry_string_representation(project, user):
+    task = Task.objects.create(
+        project=project,
+        title="Build API",
+        created_by=user,
+    )
+
     entry = TimeEntry.objects.create(task=task, user=user, start_time=timezone.now())
 
     assert str(entry) == f"{user.full_name} - {task.title}"
 
 
 @pytest.mark.django_db
-def test_deleting_task_deletes_time_entries(task, user):
+def test_deleting_task_deletes_time_entries(project, user):
+    task = Task.objects.create(
+        project=project,
+        title="Build API",
+        created_by=user,
+    )
+
     entry = TimeEntry.objects.create(task=task, user=user, start_time=timezone.now())
 
     entry_id = entry.id
