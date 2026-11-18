@@ -42,7 +42,7 @@ class Task(models.Model):
     )
 
     completed_at = models.DateTimeField(blank=True, null=True)
-    archieved = models.BooleanField(default=False)
+    archived = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["due_date", "title"]
