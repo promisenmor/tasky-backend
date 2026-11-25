@@ -22,7 +22,7 @@ class Task(models.Model):
     id = models.UUIDField(default=uuid4, primary_key=True, editable=False)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    label = models.ManyToManyField(
+    labels = models.ManyToManyField(
         "Label", through="TaskLabel", related_name="tasks", blank=True
     )
     project = models.ForeignKey(
