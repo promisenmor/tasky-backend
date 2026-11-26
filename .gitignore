@@ -33,3 +33,8 @@ Thumbs.db
 .ruff_cache/
 .mypy_cache/
 .pytest_cache/
+
+
+# copied files
+docker-compose.multiserver.yml
+nginx.multiserver.conf
