@@ -1,4 +1,5 @@
 import pytest
+from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 
 from apps.accounts.models import User
@@ -98,4 +99,22 @@ def non_member_user(django_user_model):
         first_name="Non",
         last_name="Member",
         password="password",
+    )
+
+
+@pytest.fixture
+def uploaded_file():
+    return SimpleUploadedFile(
+        name="requirements.pdf",
+        content=b"Tasky attachment test content",
+        content_type="application/pdf",
+    )
+
+
+@pytest.fixture
+def task(project, user):
+    return project.tasks.create(
+        title="Test Task",
+        description="A test task.",
+        created_by=user,
     )
